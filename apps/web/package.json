@@ -1,25 +1,25 @@
 {
-  "name": "@shopify-support/web",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -p tsconfig.app.json --noEmit && vite build",
-    "typecheck": "tsc -p tsconfig.app.json --noEmit",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@shopify-support/shared": "workspace:*",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "zod": "^3.25.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.0.0",
-    "typescript": "~5.7.0",
-    "vite": "^6.0.0"
-  }
+    "name": "@shopify-support/web",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc -p tsconfig.app.json --noEmit && vite build",
+        "typecheck": "tsc -p tsconfig.app.json --noEmit",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@shopify-support/shared": "workspace:*",
+        "react": "^18.3.0",
+        "react-dom": "^18.3.0",
+        "zod": "^3.25.0"
+    },
+    "devDependencies": {
+        "@types/react": "^18.3.0",
+        "@types/react-dom": "^18.3.0",
+        "@vitejs/plugin-react": "^4.0.0",
+        "typescript": "~5.7.0",
+        "vite": "^6.0.0"
+    }
 }

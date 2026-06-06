@@ -1,12 +1,12 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "declaration": false,
-    "declarationMap": false,
-    "paths": {
-      "@shopify-support/shared": ["../../packages/shared/src/index.ts"]
-    }
-  },
-  "include": ["src", "../../packages/shared/src"]
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "outDir": "./dist",
+        "declaration": false,
+        "declarationMap": false,
+        "paths": {
+            "@shopify-support/shared": ["../../packages/shared/src/index.ts"]
+        }
+    },
+    "include": ["src", "../../packages/shared/src"]
 }

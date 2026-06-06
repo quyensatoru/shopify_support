@@ -1,25 +1,25 @@
 {
-  "name": "@shopify-support/shared",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+    "name": "@shopify-support/shared",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "dev": "tsc -p tsconfig.json --watch"
+    },
+    "dependencies": {
+        "zod": "^3.25.0"
+    },
+    "devDependencies": {
+        "typescript": "~5.7.0"
     }
-  },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "tsc -p tsconfig.json --watch"
-  },
-  "dependencies": {
-    "zod": "^3.25.0"
-  },
-  "devDependencies": {
-    "typescript": "~5.7.0"
-  }
 }

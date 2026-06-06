@@ -3,38 +3,48 @@ import { getLlm } from '../llm/index.js';
 import type { Hypothesis, Evidence, Synthesis } from '@shopify-support/shared';
 
 const AnalyzeOutputSchema = z.object({
-  verdicts: z.array(z.object({
-    hypothesisId: z.string(),
-    status: z.enum(['confirmed', 'rejected', 'inconclusive']),
-    rationale: z.string().min(1),
-    evidenceRefs: z.array(z.string()),
-  })).min(1),
-  rootCause: z.string().min(1).describe('Specific root cause, grounded in evidence'),
-  confidence: z.enum(['low', 'medium', 'high']),
-  recommendedFix: z.string().optional(),
-  nextSteps: z.array(z.string()).default([]),
+    verdicts: z
+        .array(
+            z.object({
+                hypothesisId: z.string(),
+                status: z.enum(['confirmed', 'rejected', 'inconclusive']),
+                rationale: z.string().min(1),
+                evidenceRefs: z.array(z.string()),
+            }),
+        )
+        .min(1),
+    rootCause: z.string().min(1).describe('Specific root cause, grounded in evidence'),
+    confidence: z.enum(['low', 'medium', 'high']),
+    recommendedFix: z.string().optional(),
+    nextSteps: z.array(z.string()).default([]),
 });
 
 export async function runAnalyzeReasoning(input: {
-  app: string;
-  issueText: string;
-  caseType: string;
-  hypotheses: Hypothesis[];
-  evidence: Evidence[];
-  missingContext: string[];
+    app: string;
+    issueText: string;
+    caseType: string;
+    hypotheses: Hypothesis[];
+    evidence: Evidence[];
+    missingContext: string[];
 }): Promise<Synthesis> {
-  const llm = getLlm();
-  const structured = llm.withStructuredOutput(AnalyzeOutputSchema, { name: 'analyze_output' });
+    const llm = getLlm();
+    const structured = llm.withStructuredOutput(AnalyzeOutputSchema, { name: 'analyze_output' });
 
-  const evidenceSummary = input.evidence
-    .map((e) => `[${e.id}] surface=${e.surface}: ${e.claim} | value=${JSON.stringify(e.value).slice(0, 200)}`)
-    .join('\n');
+    const evidenceSummary = input.evidence
+        .map(
+            (e) =>
+                `[${e.id}] surface=${e.surface}: ${e.claim} | value=${JSON.stringify(e.value).slice(0, 200)}`,
+        )
+        .join('\n');
 
-  const hypothesisList = input.hypotheses
-    .map((h) => `[${h.id}] rank=${h.rank}: ${h.statement}\n  CONFIRM: ${h.confirmSignals.join(', ')}\n  REJECT: ${h.rejectSignals.join(', ')}`)
-    .join('\n\n');
+    const hypothesisList = input.hypotheses
+        .map(
+            (h) =>
+                `[${h.id}] rank=${h.rank}: ${h.statement}\n  CONFIRM: ${h.confirmSignals.join(', ')}\n  REJECT: ${h.rejectSignals.join(', ')}`,
+        )
+        .join('\n\n');
 
-  const prompt = `You are a Shopify embedded app support engineer performing root cause analysis.
+    const prompt = `You are a Shopify embedded app support engineer performing root cause analysis.
 
 App: ${input.app}
 Issue: ${input.issueText}
@@ -58,6 +68,6 @@ Instructions:
 4. recommendedFix: only if confidence ≥ medium and a clear fix exists.
 5. nextSteps: what the developer should investigate or verify manually.`;
 
-  const result = await structured.invoke(prompt);
-  return result as Synthesis;
+    const result = await structured.invoke(prompt);
+    return result as Synthesis;
 }

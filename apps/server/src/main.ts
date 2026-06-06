@@ -10,20 +10,20 @@ import { runMigrations } from './db/migrate.js';
 import { logger } from './observability/logger.js';
 
 async function main() {
-  const env = getEnv();
+    const env = getEnv();
 
-  if (env.DATABASE_MIGRATE_ON_START) {
-    await runMigrations();
-  }
+    if (env.DATABASE_MIGRATE_ON_START) {
+        await runMigrations();
+    }
 
-  const app = buildApp();
+    const app = buildApp();
 
-  app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Server started');
-  });
+    app.listen(env.PORT, () => {
+        logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Server started');
+    });
 }
 
 main().catch((err) => {
-  logger.error(err, 'Fatal startup error');
-  process.exit(1);
+    logger.error(err, 'Fatal startup error');
+    process.exit(1);
 });

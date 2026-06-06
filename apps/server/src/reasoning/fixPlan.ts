@@ -3,39 +3,45 @@ import { getLlm } from '../llm/index.js';
 import type { Synthesis, Evidence, ResolvedAppConfig, FixPlan } from '@shopify-support/shared';
 
 const FixPlanOutputSchema = z.object({
-  changes: z.array(z.object({
-    kind: z.enum(['code', 'config', 'data']),
-    description: z.string(),
-    file: z.string().optional(),
-    diff: z.string().optional(),
-    configKey: z.string().optional(),
-    configValue: z.unknown().optional(),
-    dataSource: z.string().optional(),
-    dataQuery: z.string().optional(),
-  })).min(1),
-  verification: z.array(z.object({
-    surface: z.enum(['code', 'database', 'logs', 'shopify', 'browser', 'config']),
-    action: z.string(),
-    target: z.record(z.string(), z.string()),
-    expectedOutcome: z.string(),
-  })),
-  risk: z.enum(['low', 'medium', 'high']),
-  summary: z.string(),
+    changes: z
+        .array(
+            z.object({
+                kind: z.enum(['code', 'config', 'data']),
+                description: z.string(),
+                file: z.string().optional(),
+                diff: z.string().optional(),
+                configKey: z.string().optional(),
+                configValue: z.unknown().optional(),
+                dataSource: z.string().optional(),
+                dataQuery: z.string().optional(),
+            }),
+        )
+        .min(1),
+    verification: z.array(
+        z.object({
+            surface: z.enum(['code', 'database', 'logs', 'shopify', 'browser', 'config']),
+            action: z.string(),
+            target: z.record(z.string(), z.string()),
+            expectedOutcome: z.string(),
+        }),
+    ),
+    risk: z.enum(['low', 'medium', 'high']),
+    summary: z.string(),
 });
 
 export async function runFixPlanReasoning(input: {
-  app: string;
-  issueText: string;
-  synthesis: Synthesis;
-  evidence: Evidence[];
-  appConfig?: ResolvedAppConfig;
+    app: string;
+    issueText: string;
+    synthesis: Synthesis;
+    evidence: Evidence[];
+    appConfig?: ResolvedAppConfig;
 }): Promise<FixPlan> {
-  const llm = getLlm();
-  const structured = llm.withStructuredOutput(FixPlanOutputSchema, { name: 'fix_plan_output' });
+    const llm = getLlm();
+    const structured = llm.withStructuredOutput(FixPlanOutputSchema, { name: 'fix_plan_output' });
 
-  const repos = input.appConfig?.repos.map((r) => r.name).join(', ') || 'unknown';
+    const repos = input.appConfig?.repos.map((r) => r.name).join(', ') || 'unknown';
 
-  const prompt = `You are a Shopify embedded app engineer creating a fix plan.
+    const prompt = `You are a Shopify embedded app engineer creating a fix plan.
 
 App: ${input.app} | Repos: ${repos}
 Issue: ${input.issueText}
@@ -52,6 +58,6 @@ Produce a concrete fix plan:
 - risk: low (typo/config) | medium (logic change) | high (data migration/schema change).
 - summary: one paragraph for the CSE to explain to the merchant.`;
 
-  const result = await structured.invoke(prompt);
-  return result as FixPlan;
+    const result = await structured.invoke(prompt);
+    return result as FixPlan;
 }
