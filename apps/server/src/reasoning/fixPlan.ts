@@ -1,0 +1,57 @@
+import { z } from 'zod';
+import { getLlm } from '../llm/index.js';
+import type { Synthesis, Evidence, ResolvedAppConfig, FixPlan } from '@shopify-support/shared';
+
+const FixPlanOutputSchema = z.object({
+  changes: z.array(z.object({
+    kind: z.enum(['code', 'config', 'data']),
+    description: z.string(),
+    file: z.string().optional(),
+    diff: z.string().optional(),
+    configKey: z.string().optional(),
+    configValue: z.unknown().optional(),
+    dataSource: z.string().optional(),
+    dataQuery: z.string().optional(),
+  })).min(1),
+  verification: z.array(z.object({
+    surface: z.enum(['code', 'database', 'logs', 'shopify', 'browser', 'config']),
+    action: z.string(),
+    target: z.record(z.string(), z.string()),
+    expectedOutcome: z.string(),
+  })),
+  risk: z.enum(['low', 'medium', 'high']),
+  summary: z.string(),
+});
+
+export async function runFixPlanReasoning(input: {
+  app: string;
+  issueText: string;
+  synthesis: Synthesis;
+  evidence: Evidence[];
+  appConfig?: ResolvedAppConfig;
+}): Promise<FixPlan> {
+  const llm = getLlm();
+  const structured = llm.withStructuredOutput(FixPlanOutputSchema, { name: 'fix_plan_output' });
+
+  const repos = input.appConfig?.repos.map((r) => r.name).join(', ') || 'unknown';
+
+  const prompt = `You are a Shopify embedded app engineer creating a fix plan.
+
+App: ${input.app} | Repos: ${repos}
+Issue: ${input.issueText}
+Root cause (${input.synthesis.confidence} confidence): ${input.synthesis.rootCause}
+Recommended fix: ${input.synthesis.recommendedFix ?? 'none specified'}
+
+Evidence:
+${input.evidence.map((e) => `- ${e.claim}: ${JSON.stringify(e.value).slice(0, 150)}`).join('\n')}
+
+Produce a concrete fix plan:
+- changes: specific file diffs (unified diff format), config changes, or data fixes needed.
+  v1 ONLY supports kind=code (GitLab MR). Mark config/data as kind=config/data but these will be shown for manual review.
+- verification: probes to run AFTER the fix to confirm it worked (same probe format as diagnosis).
+- risk: low (typo/config) | medium (logic change) | high (data migration/schema change).
+- summary: one paragraph for the CSE to explain to the merchant.`;
+
+  const result = await structured.invoke(prompt);
+  return result as FixPlan;
+}
