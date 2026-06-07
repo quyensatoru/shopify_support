@@ -18,9 +18,31 @@ async function main() {
 
     const app = buildApp();
 
-    app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, () => {
         logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Server started');
     });
+
+    const shutdown = (signal: string) => {
+        logger.info({ signal }, 'Shutting down server');
+
+        server.close((err) => {
+            if (err) {
+                logger.error(err, 'Error while closing server');
+                process.exit(1);
+            }
+
+            logger.info('Server closed');
+            process.exit(0);
+        });
+
+        setTimeout(() => {
+            logger.warn('Force exit after timeout');
+            process.exit(1);
+        }, 5000).unref();
+    };
+
+    process.once('SIGINT', () => shutdown('SIGINT'));
+    process.once('SIGTERM', () => shutdown('SIGTERM'));
 }
 
 main().catch((err) => {

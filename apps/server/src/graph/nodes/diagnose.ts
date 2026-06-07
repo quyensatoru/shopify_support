@@ -45,7 +45,7 @@ export async function diagnoseNode(state: SupportStateType) {
     // Dispatch all probes in parallel
     const results = await Promise.all(
         batch.map((probe) =>
-            dispatchInvestigator(probe, state.appConfig, state.request).catch(
+            dispatchInvestigator(probe, state.appConfig, state.request, state.codeContexts).catch(
                 (err): ProbeResult => ({
                     probeId: probe.id,
                     surface: probe.surface,

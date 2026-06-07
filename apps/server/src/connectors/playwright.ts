@@ -1,13 +1,14 @@
 import type { Browser } from 'playwright';
 import { getEnv } from '../env.js';
 
-type PageSignals = {
+export type PageSignals = {
     title: string;
     status: number;
     html: string;
     scripts: string[];
     consoleErrors: string[];
     networkErrors: string[];
+    responseHeaders: Record<string, string>;
 };
 
 let _browser: Browser | undefined;
@@ -40,9 +41,11 @@ export async function renderPage(url: string): Promise<PageSignals> {
     });
 
     let status = 0;
+    let responseHeaders: Record<string, string> = {};
     try {
         const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 20_000 });
         status = response?.status() ?? 0;
+        responseHeaders = (response?.headers() ?? {}) as Record<string, string>;
     } catch {
         status = 0;
     }
@@ -58,7 +61,7 @@ export async function renderPage(url: string): Promise<PageSignals> {
 
     await context.close();
 
-    return { title, status, html: html.slice(0, 50_000), scripts, consoleErrors, networkErrors };
+    return { title, status, html: html.slice(0, 50_000), scripts, consoleErrors, networkErrors, responseHeaders };
 }
 
 export async function closeBrowser(): Promise<void> {

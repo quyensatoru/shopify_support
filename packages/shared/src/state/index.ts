@@ -41,7 +41,7 @@ export const HypothesisSchema = z.object({
     whyPlausible: z.string(),
     confirmSignals: z.array(z.string()).min(1),
     rejectSignals: z.array(z.string()).min(1),
-    confidence: z.enum(['low', 'medium']),
+    confidence: z.enum(['low', 'medium', 'high']),
     suggestedSurfaces: z.array(SurfaceSchema),
 });
 export type Hypothesis = z.infer<typeof HypothesisSchema>;
@@ -209,6 +209,28 @@ export const SupportRunOutputSchema = z.object({
 });
 export type SupportRunOutput = z.infer<typeof SupportRunOutputSchema>;
 
+// ── Code context (from codegraph, per-repo) ──────────────────────────
+export const CodeContextSchema = z.object({
+    repo: z.string(),
+    framework: z.string().optional(),
+    contextMarkdown: z.string(),
+    relevantSymbols: z.array(
+        z.object({ name: z.string(), file: z.string(), kind: z.string(), line: z.number().optional() }),
+    ).default([]),
+    expectedMarkers: z.array(z.string()).default([]),
+});
+export type CodeContext = z.infer<typeof CodeContextSchema>;
+
+// ── App knowledge chunks (from web / docs) ───────────────────────────
+export const AppKnowledgeChunkSchema = z.object({
+    chunkId: z.string(),
+    source: z.enum(['web_search', 'doc_url', 'app_store']),
+    url: z.string().optional(),
+    title: z.string(),
+    chunk: z.string(),
+});
+export type AppKnowledgeChunk = z.infer<typeof AppKnowledgeChunkSchema>;
+
 // ── Full agent state (used as LangGraph Annotation source) ──────────
 // Note: exported as plain zod — server builds Annotation.Root from this.
 export const AgentStateSchema = z.object({
@@ -216,6 +238,10 @@ export const AgentStateSchema = z.object({
     request: RunRequestSchema,
     appConfig: ResolvedAppConfigSchema.optional(),
     retrievedMemories: z.array(CaseMemorySchema).default([]),
+
+    // 1b. Gathered context (deterministic, from gather_context node)
+    codeContexts: z.array(CodeContextSchema).default([]),
+    appKnowledge: z.array(AppKnowledgeChunkSchema).default([]),
 
     // 2. Plan
     normalized: NormalizedIssueSchema.optional(),

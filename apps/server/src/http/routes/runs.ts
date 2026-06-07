@@ -13,6 +13,11 @@ import { logger } from '../../observability/logger.js';
 
 const router = Router();
 
+// In-memory store for pending resume values (keyed by runId).
+// Avoids the race condition where POST /resume opens SSE that the frontend ignores,
+// then GET /stream re-invokes the graph from scratch instead of resuming.
+const pendingResumes = new Map<string, unknown>();
+
 // POST /api/runs — create a run record and return immediately
 router.post('/runs', async (req, res) => {
     try {
@@ -28,6 +33,8 @@ router.post('/runs', async (req, res) => {
             threadId,
             app: body.app,
             appKey: body.appKey,
+            storeDomain: body.storeDomain,
+            storeUrl: body.storeUrl,
             issueText: body.issueText,
             mode: body.mode ?? 'diagnose',
             reportedBy: body.reportedBy,
@@ -70,11 +77,19 @@ router.get('/runs/:id/stream', async (req, res) => {
         return;
     }
 
+    // Check if there is a pending resume value (set by POST /resume)
+    const resume = pendingResumes.get(runId);
+    if (resume !== undefined) pendingResumes.delete(runId);
+
     sseStart(res);
     const now = () => new Date().toISOString();
 
     try {
-        for await (const event of streamSupportGraph({ threadId: run.threadId, runId, request })) {
+        const streamParams = resume !== undefined
+            ? { threadId: run.threadId, runId, resume }
+            : { threadId: run.threadId, runId, request };
+
+        for await (const event of streamSupportGraph(streamParams)) {
             sseSend(res, event);
             if (event.type === 'output' || event.type === 'interrupt') break;
         }
@@ -86,7 +101,7 @@ router.get('/runs/:id/stream', async (req, res) => {
     sseEnd(res);
 });
 
-// POST /api/runs/:id/resume — resume after interrupt
+// POST /api/runs/:id/resume — store resume value; frontend then re-opens GET /stream
 router.post('/runs/:id/resume', async (req, res) => {
     const { id: runId } = req.params;
     try {
@@ -96,28 +111,12 @@ router.post('/runs/:id/resume', async (req, res) => {
             res.status(404).json({ error: 'Run not found' });
             return;
         }
-
         const resumeValue =
             body.type === 'approval' ? { decision: body.decision, note: body.note } : body.value;
 
-        sseStart(res);
-        const now = () => new Date().toISOString();
-
-        try {
-            for await (const event of streamSupportGraph({
-                threadId: run.threadId,
-                runId,
-                resume: resumeValue,
-            })) {
-                sseSend(res, event);
-                if (event.type === 'output' || event.type === 'interrupt') break;
-            }
-        } catch (err) {
-            logger.error({ runId, err }, 'Resume stream error');
-            sseSend(res, { type: 'error', message: String(err), ts: now() });
-            await updateRunStatus(runId, 'failed').catch(() => {});
-        }
-        sseEnd(res);
+        pendingResumes.set(runId, resumeValue);
+        logger.info({ runId }, 'Resume value stored — awaiting stream reconnect');
+        res.status(202).json({ ok: true });
     } catch (err) {
         res.status(400).json({ error: String(err) });
     }

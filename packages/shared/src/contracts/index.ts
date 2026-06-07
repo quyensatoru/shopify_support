@@ -84,7 +84,7 @@ export const AppConfigWriteSchema = z.object({
             }),
         )
         .optional(),
-    gitlab: z.object({ baseUrl: z.string(), token: z.string() }).optional(),
+    gitlab: z.object({ baseUrl: z.string(), token: z.string(), groupId: z.string().optional() }).optional(),
     dbSources: z
         .array(
             z.object({
@@ -117,6 +117,10 @@ export const AppConfigWriteSchema = z.object({
         .array(z.object({ key: z.string(), baseUrl: z.string(), token: z.string().optional() }))
         .optional(),
     expectedConfig: z.record(z.string(), z.unknown()).optional(),
+    appStoreUrl: z.string().optional(),
+    docUrls: z.array(z.string()).optional(),
+    homepage: z.string().optional(),
+    appDescription: z.string().optional(),
 });
 export type AppConfigWrite = z.infer<typeof AppConfigWriteSchema>;
 

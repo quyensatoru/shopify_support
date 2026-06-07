@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq, desc, and, like, sql } from 'drizzle-orm';
 import pg from 'pg';
 import { getEnv } from '../../env.js';
-import { apps, appConfigs, runs, runEvents, caseMemories, tools } from '../schema/index.js';
+import { apps, appConfigs, runs, runEvents, caseMemories, appKnowledge, tools } from '../schema/index.js';
 import type { StepLog, CaseMemory } from '@shopify-support/shared';
 
 let _pool: pg.Pool | undefined;
@@ -184,34 +184,41 @@ export async function deleteMemory(memoryId: string) {
     await getDb().delete(caseMemories).where(eq(caseMemories.memoryId, memoryId));
 }
 
-// Similarity search via pgvector (returns top-k similar memories)
+// Similarity search via pgvector — returns full memory rows ordered by cosine distance
 export async function similarMemories(
     app: string,
     embeddingJson: string,
     limit = 5,
-): Promise<Array<{ memoryId: string; issueSummary: string; rootCause: string; distance: number }>> {
+): Promise<Array<{
+    memoryId: string; app: string; caseType: string; title: string;
+    issueSummary: string; rootCause: string; fix: string | null;
+    signals: unknown; reusableInsight: string; confidence: string;
+    sourceRunId: string; createdAt: Date; distance: number;
+}>> {
     const db = getDb();
-    // Use raw SQL for vector cosine similarity
     const result = await db.execute(sql`
-    SELECT memory_id, issue_summary, root_cause,
+    SELECT memory_id, app, case_type, title, issue_summary, root_cause, fix,
+           signals, reusable_insight, confidence, source_run_id, created_at,
            embedding <=> ${embeddingJson}::vector AS distance
     FROM case_memories
     WHERE app = ${app} AND embedding IS NOT NULL
     ORDER BY distance ASC
     LIMIT ${limit}
   `);
-    return (
-        result.rows as Array<{
-            memory_id: string;
-            issue_summary: string;
-            root_cause: string;
-            distance: number;
-        }>
-    ).map((r) => ({
-        memoryId: r.memory_id,
-        issueSummary: r.issue_summary,
-        rootCause: r.root_cause,
-        distance: r.distance,
+    return (result.rows as Array<Record<string, unknown>>).map((r) => ({
+        memoryId: r['memory_id'] as string,
+        app: r['app'] as string,
+        caseType: r['case_type'] as string,
+        title: r['title'] as string,
+        issueSummary: r['issue_summary'] as string,
+        rootCause: r['root_cause'] as string,
+        fix: r['fix'] as string | null,
+        signals: r['signals'],
+        reusableInsight: r['reusable_insight'] as string,
+        confidence: r['confidence'] as string,
+        sourceRunId: r['source_run_id'] as string,
+        createdAt: r['created_at'] as Date,
+        distance: r['distance'] as number,
     }));
 }
 
@@ -222,6 +229,60 @@ export async function updateMemoryEmbedding(memoryId: string, embeddingJson: str
     SET embedding = ${embeddingJson}::vector
     WHERE memory_id = ${memoryId}
   `);
+}
+
+// ── App Knowledge ─────────────────────────────────────────────────────
+export async function insertAppKnowledgeChunk(params: {
+    appKey: string;
+    source: string;
+    url?: string;
+    title: string;
+    chunk: string;
+    contentHash: string;
+}): Promise<void> {
+    const db = getDb();
+    await db
+        .insert(appKnowledge)
+        .values(params)
+        .onConflictDoNothing();
+}
+
+export async function countAppKnowledge(appKey: string): Promise<number> {
+    const db = getDb();
+    const result = await db.execute(sql`SELECT COUNT(*) AS cnt FROM app_knowledge WHERE app_key = ${appKey}`);
+    return Number((result.rows[0] as Record<string, unknown>)['cnt'] ?? 0);
+}
+
+export async function updateAppKnowledgeEmbedding(contentHash: string, appKey: string, embeddingJson: string): Promise<void> {
+    const db = getDb();
+    await db.execute(sql`
+    UPDATE app_knowledge SET embedding = ${embeddingJson}::vector
+    WHERE app_key = ${appKey} AND content_hash = ${contentHash}
+  `);
+}
+
+export async function similarAppKnowledge(
+    appKey: string,
+    embeddingJson: string,
+    limit = 5,
+): Promise<Array<{ chunkId: string; source: string; url: string | null; title: string; chunk: string; distance: number }>> {
+    const db = getDb();
+    const result = await db.execute(sql`
+    SELECT id::text AS chunk_id, source, url, title, chunk,
+           embedding <=> ${embeddingJson}::vector AS distance
+    FROM app_knowledge
+    WHERE app_key = ${appKey} AND embedding IS NOT NULL
+    ORDER BY distance ASC
+    LIMIT ${limit}
+  `);
+    return (result.rows as Array<Record<string, unknown>>).map((r) => ({
+        chunkId: r['chunk_id'] as string,
+        source: r['source'] as string,
+        url: r['url'] as string | null,
+        title: r['title'] as string,
+        chunk: r['chunk'] as string,
+        distance: r['distance'] as number,
+    }));
 }
 
 // ── Tools ─────────────────────────────────────────────────────────────

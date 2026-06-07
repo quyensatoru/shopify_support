@@ -9,7 +9,7 @@
         "node": ">=20"
     },
     "scripts": {
-        "dev": "turbo dev",
+        "dev": "turbo dev --ui=stream",
         "dev:server": "pnpm --filter @shopify-support/server dev",
         "dev:web": "pnpm --filter @shopify-support/web dev",
         "build": "turbo build",

@@ -2,6 +2,7 @@ import { START, END, StateGraph, Command, type CompiledStateGraph } from '@langc
 import { SupportState } from './state.js';
 import { getCheckpointer } from './checkpointer.js';
 import { intakeNode } from './nodes/intake.js';
+import { gatherContextNode } from './nodes/gatherContext.js';
 import { planNode } from './nodes/plan.js';
 import { diagnoseNode } from './nodes/diagnose.js';
 import { analyzeNode } from './nodes/analyze.js';
@@ -30,6 +31,7 @@ let _compiled: CompiledStateGraph<any, any, any> | undefined;
 function buildGraph() {
     const wf = new StateGraph(SupportState)
         .addNode('intake', intakeNode)
+        .addNode('gather_context', gatherContextNode)
         .addNode('planner', planNode)
         .addNode('ask_context', askContextNode)
         .addNode('diagnose', diagnoseNode)
@@ -43,10 +45,12 @@ function buildGraph() {
         .addNode('finalize', finalizeNode)
 
         .addEdge(START, 'intake')
-        .addEdge('intake', 'planner')
+        .addEdge('intake', 'gather_context')
+        .addEdge('gather_context', 'planner')
         .addConditionalEdges('planner', decideAfterPlan, {
             ask_context: 'ask_context',
             diagnose: 'diagnose',
+            memorize: 'memorize',
         })
         .addEdge('ask_context', 'diagnose')
         .addConditionalEdges('diagnose', decideAfterDiagnose, {

@@ -63,10 +63,14 @@ export type VerdictStatus = z.infer<typeof VerdictStatusSchema>;
 
 // Surface-specific probe target (flexible by surface type)
 export const ProbeTargetSchema = z.object({
-    // code
+    // code — search_code (regex grep)
     repo: z.string().optional(),
     glob: z.string().optional(),
     regex: z.string().optional(),
+    // code — codegraph actions (find_symbol, find_callers, find_callees, impact, build_context)
+    symbol: z.string().optional(),   // symbol name to look up
+    nodeId: z.string().optional(),   // node ID for caller/callee/impact
+    depth: z.number().optional(),    // traversal depth
     // database — sql table, mongo collection, raw query
     source: z.string().optional(),
     table: z.string().optional(),
@@ -169,5 +173,10 @@ export const ResolvedAppConfigSchema = z.object({
     shopify: ShopifyConfigSchema.optional(),
     services: z.array(ServiceConfigSchema).default([]),
     expectedConfig: z.record(z.string(), z.unknown()).default({}),
+    // Non-secret public fields for app knowledge (Phase C)
+    appStoreUrl: z.string().url().optional(),
+    docUrls: z.array(z.string().url()).default([]),
+    homepage: z.string().url().optional(),
+    appDescription: z.string().optional(),
 });
 export type ResolvedAppConfig = z.infer<typeof ResolvedAppConfigSchema>;

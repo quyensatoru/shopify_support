@@ -9,7 +9,10 @@ const schema = z.object({
         .string()
         .transform((v) => v === 'true')
         .default('false'),
-    ANTHROPIC_API_KEY: z.string().min(1),
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    DEEPSEEK_API_KEY: z.string().min(1).optional(),
+    OPENROUTER_API_KEY: z.string().min(1).optional(),
     LANGCHAIN_TRACING_V2: z
         .string()
         .transform((v) => v === 'true')
@@ -22,7 +25,12 @@ const schema = z.object({
         .transform((v) => v !== 'false')
         .default('true'),
     WORKSPACE_DIR: z.string().default('./workspace'),
-});
+    TAVILY_API_KEY: z.string().min(1).optional(),
+    EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
+}).refine(
+    (d) => Boolean(d.ANTHROPIC_API_KEY ?? d.OPENAI_API_KEY),
+    { message: 'At least one of ANTHROPIC_API_KEY or OPENAI_API_KEY must be set' },
+);
 
 let _env: z.infer<typeof schema> | undefined;
 

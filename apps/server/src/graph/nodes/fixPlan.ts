@@ -11,6 +11,7 @@ export async function fixPlanNode(state: SupportStateType) {
             synthesis: state.synthesis!,
             evidence: state.evidence,
             appConfig: state.appConfig,
+            codeContexts: state.codeContexts,
         });
 
         return {

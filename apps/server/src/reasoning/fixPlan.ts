@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { getLlm } from '../llm/index.js';
-import type { Synthesis, Evidence, ResolvedAppConfig, FixPlan } from '@shopify-support/shared';
+import { getStructuredLlm } from '../llm/index.js';
+import type { Synthesis, Evidence, ResolvedAppConfig, FixPlan, CodeContext } from '@shopify-support/shared';
 
 const FixPlanOutputSchema = z.object({
     changes: z
@@ -35,11 +35,24 @@ export async function runFixPlanReasoning(input: {
     synthesis: Synthesis;
     evidence: Evidence[];
     appConfig?: ResolvedAppConfig;
+    codeContexts?: CodeContext[];
 }): Promise<FixPlan> {
-    const llm = getLlm();
-    const structured = llm.withStructuredOutput(FixPlanOutputSchema, { name: 'fix_plan_output' });
+    const structured = getStructuredLlm(FixPlanOutputSchema, 'fix_plan_output');
 
     const repos = input.appConfig?.repos.map((r) => r.name).join(', ') || 'unknown';
+
+    const codeContextSection = (input.codeContexts ?? [])
+        .map((ctx) => {
+            const symbols = ctx.relevantSymbols.slice(0, 10)
+                .map((s) => `  ${s.kind} ${s.name} @ ${s.file}${s.line ? `:${s.line}` : ''}`)
+                .join('\n');
+            return [
+                `--- Repo: ${ctx.repo}${ctx.framework ? ` (${ctx.framework})` : ''} ---`,
+                ctx.contextMarkdown.slice(0, 1500),
+                symbols ? `Relevant symbols:\n${symbols}` : '',
+            ].filter(Boolean).join('\n');
+        })
+        .join('\n\n');
 
     const prompt = `You are a Shopify embedded app engineer creating a fix plan.
 
@@ -47,6 +60,7 @@ App: ${input.app} | Repos: ${repos}
 Issue: ${input.issueText}
 Root cause (${input.synthesis.confidence} confidence): ${input.synthesis.rootCause}
 Recommended fix: ${input.synthesis.recommendedFix ?? 'none specified'}
+${codeContextSection ? `\n=== CODEBASE CONTEXT ===\n${codeContextSection}\n===` : ''}
 
 Evidence:
 ${input.evidence.map((e) => `- ${e.claim}: ${JSON.stringify(e.value).slice(0, 150)}`).join('\n')}
@@ -56,8 +70,11 @@ Produce a concrete fix plan:
   v1 ONLY supports kind=code (GitLab MR). Mark config/data as kind=config/data but these will be shown for manual review.
 - verification: probes to run AFTER the fix to confirm it worked (same probe format as diagnosis).
 - risk: low (typo/config) | medium (logic change) | high (data migration/schema change).
-- summary: one paragraph for the CSE to explain to the merchant.`;
+- summary: one paragraph for the CSE to explain to the merchant.
+
+IMPORTANT: The summary field must be written in the SAME language as the "Issue" text above.`;
 
     const result = await structured.invoke(prompt);
+    if (!result) throw new Error('fix_plan_output: LLM returned null/undefined');
     return result as FixPlan;
 }

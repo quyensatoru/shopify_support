@@ -1,4 +1,4 @@
-import type { Probe, ProbeResult, ResolvedAppConfig, RunRequest } from '@shopify-support/shared';
+import type { Probe, ProbeResult, ResolvedAppConfig, RunRequest, CodeContext } from '@shopify-support/shared';
 import { investigateCode } from './code.js';
 import { investigateDatabase } from './database.js';
 import { investigateLogs } from './logs.js';
@@ -10,6 +10,7 @@ export async function dispatchInvestigator(
     probe: Probe,
     appConfig: ResolvedAppConfig | undefined,
     request: RunRequest,
+    codeContexts?: CodeContext[],
 ): Promise<ProbeResult> {
     const t0 = Date.now();
 
@@ -36,7 +37,7 @@ export async function dispatchInvestigator(
             result = await investigateShopify(probe, appConfig, request);
             break;
         case 'browser':
-            result = await investigateBrowser(probe, request);
+            result = await investigateBrowser(probe, request, codeContexts);
             break;
         case 'config':
             result = await investigateConfig(probe, appConfig);

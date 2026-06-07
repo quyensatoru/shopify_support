@@ -1,10 +1,11 @@
 import type { SupportStateType } from '../state.js';
 import { runPlanReasoning } from '../../reasoning/plan.js';
 import { stepLog } from '../utils.js';
+import { logger } from '../../observability/logger.js';
 
 export async function planNode(state: SupportStateType) {
     const t0 = Date.now();
-    const { request, appConfig, retrievedMemories } = state;
+    const { request, appConfig, retrievedMemories, codeContexts, appKnowledge } = state;
 
     try {
         const result = await runPlanReasoning({
@@ -15,6 +16,8 @@ export async function planNode(state: SupportStateType) {
             identifiers: request.identifiers,
             appConfig,
             retrievedMemories,
+            codeContexts,
+            appKnowledge,
         });
 
         return {
@@ -32,6 +35,7 @@ export async function planNode(state: SupportStateType) {
             ],
         };
     } catch (err) {
+        logger.error({ err, runId: request.runId, node: 'planner' }, 'planner node failed');
         return {
             errors: [`plan failed: ${String(err)}`],
             timeline: [stepLog('plan', 'failed', Date.now() - t0)],

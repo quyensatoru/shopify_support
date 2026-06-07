@@ -95,6 +95,21 @@ const MIGRATIONS = [
 
     // M1: store original request payload for deferred graph execution
     `ALTER TABLE runs ADD COLUMN IF NOT EXISTS request_payload JSONB`,
+
+    // M2: app knowledge from web/docs (Phase C)
+    `CREATE TABLE IF NOT EXISTS app_knowledge (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    app_key VARCHAR(128) NOT NULL,
+    source VARCHAR(32) NOT NULL,
+    url TEXT,
+    title TEXT NOT NULL,
+    chunk TEXT NOT NULL,
+    embedding vector(1536),
+    content_hash VARCHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+    `CREATE INDEX IF NOT EXISTS app_knowledge_app_key_idx ON app_knowledge(app_key)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS app_knowledge_hash_idx ON app_knowledge(app_key, content_hash)`,
 ];
 
 export async function runMigrations(): Promise<void> {

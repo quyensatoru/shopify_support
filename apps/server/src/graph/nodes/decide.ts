@@ -9,7 +9,8 @@ function blockingMissingContext(state: SupportStateType): string[] {
     return state.missingContext;
 }
 
-export function decideAfterPlan(state: SupportStateType): 'ask_context' | 'diagnose' {
+export function decideAfterPlan(state: SupportStateType): 'ask_context' | 'diagnose' | 'memorize' {
+    if (!state.plan) return 'memorize';
     const blocking = blockingMissingContext(state);
     if (blocking.length > 0) return 'ask_context';
     return 'diagnose';

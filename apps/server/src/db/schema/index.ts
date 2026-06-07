@@ -90,6 +90,22 @@ export const caseMemories = pgTable(
     ],
 );
 
+export const appKnowledge = pgTable(
+    'app_knowledge',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        appKey: varchar('app_key', { length: 128 }).notNull(),
+        source: varchar('source', { length: 32 }).notNull(),
+        url: text('url'),
+        title: text('title').notNull(),
+        chunk: text('chunk').notNull(),
+        contentHash: varchar('content_hash', { length: 64 }).notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+        // embedding column added via raw migration
+    },
+    (t) => [index('app_knowledge_app_key_idx').on(t.appKey)],
+);
+
 export const tools = pgTable('tools', {
     id: uuid('id').primaryKey().defaultRandom(),
     toolId: varchar('tool_id', { length: 128 }).notNull().unique(),

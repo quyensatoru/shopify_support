@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getLlmFast } from '../llm/index.js';
+import { getStructuredLlmFast } from '../llm/index.js';
 import type { Synthesis, Artifacts, CaseMemory } from '@shopify-support/shared';
 import { randomUUID } from 'node:crypto';
 
@@ -20,8 +20,7 @@ export async function runDistillReasoning(input: {
     synthesis: Synthesis;
     artifacts?: Artifacts;
 }): Promise<CaseMemory> {
-    const llm = getLlmFast();
-    const structured = llm.withStructuredOutput(DistillOutputSchema, { name: 'distill_output' });
+    const structured = getStructuredLlmFast(DistillOutputSchema, 'distill_output');
 
     const prompt = `Summarize this Shopify support case into a reusable memory entry.
 
@@ -34,6 +33,7 @@ Fix applied: ${input.artifacts?.mrUrl ? `MR ${input.artifacts.mrUrl}` : (input.s
 Create a concise, reusable memory entry. Focus on the INSIGHT that would help diagnose a similar issue faster next time.`;
 
     const result = await structured.invoke(prompt);
+    if (!result) throw new Error('distill_output: LLM returned null/undefined');
 
     return {
         id: randomUUID(),

@@ -4,6 +4,8 @@ import type {
     RunRequest,
     ResolvedAppConfig,
     CaseMemory,
+    CodeContext,
+    AppKnowledgeChunk,
     NormalizedIssue,
     Hypothesis,
     Plan,
@@ -25,6 +27,16 @@ export const SupportState = Annotation.Root({
     appConfig: Annotation<ResolvedAppConfig | undefined>(),
     retrievedMemories: Annotation<CaseMemory[]>({
         reducer: (a, b) => a.concat(b),
+        default: () => [],
+    }),
+
+    // 1b. Gathered context
+    codeContexts: Annotation<CodeContext[]>({
+        reducer: (_a, b) => b,
+        default: () => [],
+    }),
+    appKnowledge: Annotation<AppKnowledgeChunk[]>({
+        reducer: (_a, b) => b,
         default: () => [],
     }),
 

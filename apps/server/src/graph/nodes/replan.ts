@@ -1,6 +1,7 @@
 import type { SupportStateType } from '../state.js';
 import { runReplanReasoning } from '../../reasoning/plan.js';
 import { stepLog } from '../utils.js';
+import { logger } from '../../observability/logger.js';
 
 export async function replanNode(state: SupportStateType) {
     const t0 = Date.now();
@@ -32,6 +33,7 @@ export async function replanNode(state: SupportStateType) {
             ],
         };
     } catch (err) {
+        logger.error({ err, runId: state.request.runId, node: 'replan' }, 'replan node failed');
         return {
             errors: [`replan failed: ${String(err)}`],
             timeline: [stepLog('replan', 'failed', Date.now() - t0)],
