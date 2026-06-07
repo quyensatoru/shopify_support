@@ -1,4 +1,10 @@
-import type { Probe, ProbeResult, ResolvedAppConfig, RunRequest, CodeContext } from '@shopify-support/shared';
+import type {
+    Probe,
+    ProbeResult,
+    ResolvedAppConfig,
+    RunRequest,
+    CodeContext,
+} from '@shopify-support/shared';
 import { investigateCode } from './code.js';
 import { investigateDatabase } from './database.js';
 import { investigateLogs } from './logs.js';

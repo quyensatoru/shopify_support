@@ -85,9 +85,10 @@ router.get('/runs/:id/stream', async (req, res) => {
     const now = () => new Date().toISOString();
 
     try {
-        const streamParams = resume !== undefined
-            ? { threadId: run.threadId, runId, resume }
-            : { threadId: run.threadId, runId, request };
+        const streamParams =
+            resume !== undefined
+                ? { threadId: run.threadId, runId, resume }
+                : { threadId: run.threadId, runId, request };
 
         for await (const event of streamSupportGraph(streamParams)) {
             sseSend(res, event);

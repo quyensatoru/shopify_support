@@ -81,7 +81,7 @@ export function resolveAppConfig(row: AppConfigRow): ResolvedAppConfig {
         services,
         expectedConfig: (cfg['expectedConfig'] as Record<string, unknown>) ?? {},
         appStoreUrl: (cfg['appStoreUrl'] as string | undefined) || undefined,
-        docUrls: ((cfg['docUrls'] as string[] | undefined) ?? []),
+        docUrls: (cfg['docUrls'] as string[] | undefined) ?? [],
         homepage: (cfg['homepage'] as string | undefined) || undefined,
         appDescription: (cfg['appDescription'] as string | undefined) || undefined,
     };

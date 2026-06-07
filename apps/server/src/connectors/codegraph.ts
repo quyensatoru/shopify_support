@@ -12,7 +12,11 @@
  */
 
 import _codegraphPkg from '@colbymchenry/codegraph';
-import type { CodeGraph as CodeGraphType, SearchResult, IndexProgress } from '@colbymchenry/codegraph';
+import type {
+    CodeGraph as CodeGraphType,
+    SearchResult,
+    IndexProgress,
+} from '@colbymchenry/codegraph';
 
 // CJS interop: npm-sdk.js does `module.exports = require(platformBundle)`, so Node's
 // ESM loader cannot statically synthesize named exports from that dynamic re-export.
@@ -59,7 +63,10 @@ export async function ensureIndex(
             index: true,
             onProgress: (p: IndexProgress) => {
                 if (p.current % 100 === 0) {
-                    logger.debug({ repo: repo.name, phase: p.phase, current: p.current, total: p.total }, 'codegraph indexing');
+                    logger.debug(
+                        { repo: repo.name, phase: p.phase, current: p.current, total: p.total },
+                        'codegraph indexing',
+                    );
                 }
             },
         });
@@ -73,10 +80,7 @@ export async function ensureIndex(
  * Build a markdown context summary for the given query (issue text).
  * Returns null on any error — caller logs and continues without context.
  */
-export async function buildRepoContext(
-    cg: CgInstance,
-    query: string,
-): Promise<string | null> {
+export async function buildRepoContext(cg: CgInstance, query: string): Promise<string | null> {
     try {
         const result = await cg.buildContext(query, {
             maxNodes: 30,
@@ -85,10 +89,21 @@ export async function buildRepoContext(
         });
         if (typeof result === 'string') return result;
         const subgraphNodes = Array.from(result.subgraph.nodes.values()).slice(0, 20);
-        return JSON.stringify({
-            entryPoints: result.entryPoints.slice(0, 5).map((n) => ({ name: n.name, file: n.filePath, kind: n.kind })),
-            relevantNodes: subgraphNodes.map((n) => ({ name: n.name, file: n.filePath, kind: n.kind, line: n.startLine })),
-        }, null, 2);
+        return JSON.stringify(
+            {
+                entryPoints: result.entryPoints
+                    .slice(0, 5)
+                    .map((n) => ({ name: n.name, file: n.filePath, kind: n.kind })),
+                relevantNodes: subgraphNodes.map((n) => ({
+                    name: n.name,
+                    file: n.filePath,
+                    kind: n.kind,
+                    line: n.startLine,
+                })),
+            },
+            null,
+            2,
+        );
     } catch (err) {
         logger.warn({ err }, 'codegraph buildContext failed (non-fatal)');
         return null;
@@ -159,8 +174,11 @@ export function getImpact(
 ): Array<{ name: string; file: string; kind: string }> {
     try {
         const sub = cg.getImpactRadius(nodeId, maxDepth);
-        return Array.from(sub.nodes.values())
-            .map((n) => ({ name: n.name, file: n.filePath ?? '', kind: n.kind }));
+        return Array.from(sub.nodes.values()).map((n) => ({
+            name: n.name,
+            file: n.filePath ?? '',
+            kind: n.kind,
+        }));
     } catch (err) {
         logger.warn({ err, nodeId }, 'codegraph getImpactRadius failed');
         return [];

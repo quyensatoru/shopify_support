@@ -214,9 +214,16 @@ export const CodeContextSchema = z.object({
     repo: z.string(),
     framework: z.string().optional(),
     contextMarkdown: z.string(),
-    relevantSymbols: z.array(
-        z.object({ name: z.string(), file: z.string(), kind: z.string(), line: z.number().optional() }),
-    ).default([]),
+    relevantSymbols: z
+        .array(
+            z.object({
+                name: z.string(),
+                file: z.string(),
+                kind: z.string(),
+                line: z.number().optional(),
+            }),
+        )
+        .default([]),
     expectedMarkers: z.array(z.string()).default([]),
 });
 export type CodeContext = z.infer<typeof CodeContextSchema>;

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { getStructuredLlm } from '../llm/index.js';
-import type { Synthesis, Evidence, ResolvedAppConfig, FixPlan, CodeContext } from '@shopify-support/shared';
+import type {
+    Synthesis,
+    Evidence,
+    ResolvedAppConfig,
+    FixPlan,
+    CodeContext,
+} from '@shopify-support/shared';
 
 const FixPlanOutputSchema = z.object({
     changes: z
@@ -43,14 +49,17 @@ export async function runFixPlanReasoning(input: {
 
     const codeContextSection = (input.codeContexts ?? [])
         .map((ctx) => {
-            const symbols = ctx.relevantSymbols.slice(0, 10)
+            const symbols = ctx.relevantSymbols
+                .slice(0, 10)
                 .map((s) => `  ${s.kind} ${s.name} @ ${s.file}${s.line ? `:${s.line}` : ''}`)
                 .join('\n');
             return [
                 `--- Repo: ${ctx.repo}${ctx.framework ? ` (${ctx.framework})` : ''} ---`,
                 ctx.contextMarkdown.slice(0, 1500),
                 symbols ? `Relevant symbols:\n${symbols}` : '',
-            ].filter(Boolean).join('\n');
+            ]
+                .filter(Boolean)
+                .join('\n');
         })
         .join('\n\n');
 

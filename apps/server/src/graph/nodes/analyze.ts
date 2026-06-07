@@ -7,9 +7,14 @@ export async function analyzeNode(state: SupportStateType) {
     const t0 = Date.now();
 
     if (!state.hypotheses.length) {
-        logger.warn({ runId: state.request.runId, node: 'analyze' }, 'analyze skipped — no hypotheses');
+        logger.warn(
+            { runId: state.request.runId, node: 'analyze' },
+            'analyze skipped — no hypotheses',
+        );
         return {
-            timeline: [stepLog('analyze', 'skipped', Date.now() - t0, 'no hypotheses from planner')],
+            timeline: [
+                stepLog('analyze', 'skipped', Date.now() - t0, 'no hypotheses from planner'),
+            ],
         };
     }
 

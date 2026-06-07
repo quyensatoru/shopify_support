@@ -2,7 +2,15 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq, desc, and, like, sql } from 'drizzle-orm';
 import pg from 'pg';
 import { getEnv } from '../../env.js';
-import { apps, appConfigs, runs, runEvents, caseMemories, appKnowledge, tools } from '../schema/index.js';
+import {
+    apps,
+    appConfigs,
+    runs,
+    runEvents,
+    caseMemories,
+    appKnowledge,
+    tools,
+} from '../schema/index.js';
 import type { StepLog, CaseMemory } from '@shopify-support/shared';
 
 let _pool: pg.Pool | undefined;
@@ -189,12 +197,23 @@ export async function similarMemories(
     app: string,
     embeddingJson: string,
     limit = 5,
-): Promise<Array<{
-    memoryId: string; app: string; caseType: string; title: string;
-    issueSummary: string; rootCause: string; fix: string | null;
-    signals: unknown; reusableInsight: string; confidence: string;
-    sourceRunId: string; createdAt: Date; distance: number;
-}>> {
+): Promise<
+    Array<{
+        memoryId: string;
+        app: string;
+        caseType: string;
+        title: string;
+        issueSummary: string;
+        rootCause: string;
+        fix: string | null;
+        signals: unknown;
+        reusableInsight: string;
+        confidence: string;
+        sourceRunId: string;
+        createdAt: Date;
+        distance: number;
+    }>
+> {
     const db = getDb();
     const result = await db.execute(sql`
     SELECT memory_id, app, case_type, title, issue_summary, root_cause, fix,
@@ -241,19 +260,22 @@ export async function insertAppKnowledgeChunk(params: {
     contentHash: string;
 }): Promise<void> {
     const db = getDb();
-    await db
-        .insert(appKnowledge)
-        .values(params)
-        .onConflictDoNothing();
+    await db.insert(appKnowledge).values(params).onConflictDoNothing();
 }
 
 export async function countAppKnowledge(appKey: string): Promise<number> {
     const db = getDb();
-    const result = await db.execute(sql`SELECT COUNT(*) AS cnt FROM app_knowledge WHERE app_key = ${appKey}`);
+    const result = await db.execute(
+        sql`SELECT COUNT(*) AS cnt FROM app_knowledge WHERE app_key = ${appKey}`,
+    );
     return Number((result.rows[0] as Record<string, unknown>)['cnt'] ?? 0);
 }
 
-export async function updateAppKnowledgeEmbedding(contentHash: string, appKey: string, embeddingJson: string): Promise<void> {
+export async function updateAppKnowledgeEmbedding(
+    contentHash: string,
+    appKey: string,
+    embeddingJson: string,
+): Promise<void> {
     const db = getDb();
     await db.execute(sql`
     UPDATE app_knowledge SET embedding = ${embeddingJson}::vector
@@ -265,7 +287,16 @@ export async function similarAppKnowledge(
     appKey: string,
     embeddingJson: string,
     limit = 5,
-): Promise<Array<{ chunkId: string; source: string; url: string | null; title: string; chunk: string; distance: number }>> {
+): Promise<
+    Array<{
+        chunkId: string;
+        source: string;
+        url: string | null;
+        title: string;
+        chunk: string;
+        distance: number;
+    }>
+> {
     const db = getDb();
     const result = await db.execute(sql`
     SELECT id::text AS chunk_id, source, url, title, chunk,

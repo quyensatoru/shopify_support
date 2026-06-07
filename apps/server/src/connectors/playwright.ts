@@ -61,7 +61,15 @@ export async function renderPage(url: string): Promise<PageSignals> {
 
     await context.close();
 
-    return { title, status, html: html.slice(0, 50_000), scripts, consoleErrors, networkErrors, responseHeaders };
+    return {
+        title,
+        status,
+        html: html.slice(0, 50_000),
+        scripts,
+        consoleErrors,
+        networkErrors,
+        responseHeaders,
+    };
 }
 
 export async function closeBrowser(): Promise<void> {

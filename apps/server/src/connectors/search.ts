@@ -12,10 +12,7 @@ export interface TavilyResult {
     score: number;
 }
 
-export async function tavilySearch(
-    query: string,
-    maxResults = 5,
-): Promise<TavilyResult[] | null> {
+export async function tavilySearch(query: string, maxResults = 5): Promise<TavilyResult[] | null> {
     const { TAVILY_API_KEY } = getEnv();
     if (!TAVILY_API_KEY) {
         logger.warn({ query }, 'tavilySearch: TAVILY_API_KEY not set — skipping web search');
@@ -40,7 +37,9 @@ export async function tavilySearch(
             return null;
         }
 
-        const data = (await res.json()) as { results?: Array<{ url: string; title: string; content: string; score: number }> };
+        const data = (await res.json()) as {
+            results?: Array<{ url: string; title: string; content: string; score: number }>;
+        };
         return (data.results ?? []).map((r) => ({
             url: r.url,
             title: r.title,

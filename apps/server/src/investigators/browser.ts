@@ -2,7 +2,8 @@ import type { Probe, ProbeResult, RunRequest, CodeContext } from '@shopify-suppo
 import { renderPage } from '../connectors/playwright.js';
 
 function extractCspFrameAncestors(headers: Record<string, string>): string | null {
-    const csp = headers['content-security-policy'] ?? headers['content-security-policy-report-only'] ?? '';
+    const csp =
+        headers['content-security-policy'] ?? headers['content-security-policy-report-only'] ?? '';
     const match = /frame-ancestors\s+([^;]+)/i.exec(csp);
     return match ? match[1]!.trim() : null;
 }
@@ -11,7 +12,7 @@ function detectAppBridge(scripts: string[], html: string): boolean {
     return (
         scripts.some((s) => s.includes('app-bridge') || s.includes('app_bridge')) ||
         html.includes('@shopify/app-bridge') ||
-        html.includes('createApp') && html.includes('shopify') ||
+        (html.includes('createApp') && html.includes('shopify')) ||
         html.includes('AppBridge')
     );
 }

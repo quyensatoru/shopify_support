@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { AppConfigWriteSchema } from '@shopify-support/shared';
-import { listApps, getApp, upsertAppConfig, getAppConfig, countAppKnowledge } from '../../db/repo/index.js';
+import {
+    listApps,
+    getApp,
+    upsertAppConfig,
+    getAppConfig,
+    countAppKnowledge,
+} from '../../db/repo/index.js';
 import { learnApp } from '../../knowledge/index.js';
 import { resolveAppConfig } from '../../config/index.js';
 import { encrypt } from '../../config/crypto.js';
@@ -67,11 +73,23 @@ router.post('/apps/:appKey/config/test', async (req, res) => {
         try {
             const ctrl = new AbortController();
             const t = setTimeout(() => ctrl.abort(), 5000);
-            const r = await fetch(repo.url, { method: 'HEAD', signal: ctrl.signal }).catch(() => null);
+            const r = await fetch(repo.url, { method: 'HEAD', signal: ctrl.signal }).catch(
+                () => null,
+            );
             clearTimeout(t);
-            results.push({ surface: 'repo', key: repo.name, ok: r !== null && r.status < 500, message: r ? `HTTP ${r.status}` : 'unreachable' });
+            results.push({
+                surface: 'repo',
+                key: repo.name,
+                ok: r !== null && r.status < 500,
+                message: r ? `HTTP ${r.status}` : 'unreachable',
+            });
         } catch {
-            results.push({ surface: 'repo', key: repo.name, ok: false, message: 'connection failed' });
+            results.push({
+                surface: 'repo',
+                key: repo.name,
+                ok: false,
+                message: 'connection failed',
+            });
         }
     }
 
@@ -94,7 +112,9 @@ router.post('/apps/:appKey/config/test', async (req, res) => {
                 message = 'connected';
             } else if (src.type === 'rabbitmq') {
                 const adapter = new RabbitMQAdapter(src.connectionString, src.mgmtUrl);
-                const info = await (adapter as unknown as { queueInspect: (q: string) => Promise<unknown> }).queueInspect('');
+                const info = await (
+                    adapter as unknown as { queueInspect: (q: string) => Promise<unknown> }
+                ).queueInspect('');
                 ok = info !== null;
                 message = ok ? 'management API reachable' : 'management API unreachable';
             } else if (src.type === 'mongo') {
@@ -114,31 +134,63 @@ router.post('/apps/:appKey/config/test', async (req, res) => {
         const storeDomain = (req.query['storeDomain'] as string | undefined) ?? '';
         if (storeDomain) {
             try {
-                await shopifyAdminQuery(storeDomain, resolved.shopify.adminToken, resolved.shopify.apiVersion, '{ shop { name } }');
-                results.push({ surface: 'shopify', key: 'api', ok: true, message: 'API reachable' });
+                await shopifyAdminQuery(
+                    storeDomain,
+                    resolved.shopify.adminToken,
+                    resolved.shopify.apiVersion,
+                    '{ shop { name } }',
+                );
+                results.push({
+                    surface: 'shopify',
+                    key: 'api',
+                    ok: true,
+                    message: 'API reachable',
+                });
             } catch (err) {
-                results.push({ surface: 'shopify', key: 'api', ok: false, message: String(err).slice(0, 100) });
+                results.push({
+                    surface: 'shopify',
+                    key: 'api',
+                    ok: false,
+                    message: String(err).slice(0, 100),
+                });
             }
         } else {
-            results.push({ surface: 'shopify', key: 'api', ok: true, message: 'configured (no storeDomain to test live)' });
+            results.push({
+                surface: 'shopify',
+                key: 'api',
+                ok: true,
+                message: 'configured (no storeDomain to test live)',
+            });
         }
     }
 
     // Test log sources (HEAD on endpoint)
-    for (const ls of (resolved.logSources ?? [])) {
+    for (const ls of resolved.logSources ?? []) {
         try {
             const ctrl = new AbortController();
             const t = setTimeout(() => ctrl.abort(), 4000);
-            const r = await fetch(ls.endpoint, { method: 'HEAD', signal: ctrl.signal }).catch(() => null);
+            const r = await fetch(ls.endpoint, { method: 'HEAD', signal: ctrl.signal }).catch(
+                () => null,
+            );
             clearTimeout(t);
-            results.push({ surface: 'logs', key: ls.key, ok: r !== null && r.status < 500, message: r ? `HTTP ${r.status}` : 'unreachable' });
+            results.push({
+                surface: 'logs',
+                key: ls.key,
+                ok: r !== null && r.status < 500,
+                message: r ? `HTTP ${r.status}` : 'unreachable',
+            });
         } catch {
             results.push({ surface: 'logs', key: ls.key, ok: false, message: 'connection failed' });
         }
     }
 
     if (results.length === 0) {
-        results.push({ surface: 'info', key: 'none', ok: true, message: 'No connections configured to test' });
+        results.push({
+            surface: 'info',
+            key: 'none',
+            ok: true,
+            message: 'No connections configured to test',
+        });
     }
 
     res.json({ results });

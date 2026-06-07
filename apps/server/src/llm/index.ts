@@ -24,11 +24,11 @@ function buildAnthropic(fast: boolean): ChatAnthropic {
 function buildOpenRouter(fast: boolean): ChatOpenRouter {
     const env = getEnv();
     return new ChatOpenRouter({
-        model: "openai/gpt-oss-120b:free",
+        model: 'openai/gpt-oss-120b:free',
         apiKey: env.OPENROUTER_API_KEY!,
         temperature: 0,
         maxTokens: fast ? 1000 : 4096,
-    })
+    });
 }
 
 // ── OpenAI-compatible direct caller (used for both OpenAI & DeepSeek) ─
@@ -38,7 +38,13 @@ type DirectChain<T> = Runnable<BaseLanguageModelInput, T>;
 
 function buildDirectChain<T>(
     schema: z.ZodType<T>,
-    cfg: { apiKey: string; baseURL?: string; model: string; maxTokens: number; temperature: number },
+    cfg: {
+        apiKey: string;
+        baseURL?: string;
+        model: string;
+        maxTokens: number;
+        temperature: number;
+    },
 ): DirectChain<T> {
     const client = new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseURL });
     return RunnableLambda.from(async (input: BaseLanguageModelInput): Promise<T> => {
@@ -46,9 +52,7 @@ function buildDirectChain<T>(
             typeof input === 'string'
                 ? input
                 : Array.isArray(input)
-                  ? (input as Array<{ content?: string }>)
-                        .map((m) => m.content ?? '')
-                        .join('\n')
+                  ? (input as Array<{ content?: string }>).map((m) => m.content ?? '').join('\n')
                   : JSON.stringify(input);
 
         const response = await client.chat.completions.create({
@@ -104,7 +108,8 @@ function makeChain<T>(
             try {
                 const result = await chain.invoke(input);
                 // withStructuredOutput can return null when model omits tool_call/function_call
-                if (result == null) throw new Error(`Provider ${label} returned null — no structured output`);
+                if (result == null)
+                    throw new Error(`Provider ${label} returned null — no structured output`);
                 return result;
             } catch (err) {
                 lastErr = err;
@@ -130,12 +135,12 @@ function buildProviders<T>(schema: z.ZodType<T>, name: string, fast: boolean) {
     const env = getEnv();
     const providers: Array<{ chain: StructuredChain<T>; label: string }> = [];
 
-    if(env.OPENROUTER_API_KEY) {
+    if (env.OPENROUTER_API_KEY) {
         const openrouter = buildOpenRouter(fast);
         providers.push({
             chain: openrouter.withStructuredOutput(schema, { name }) as StructuredChain<T>,
-            label: 'Openrouter'
-        })
+            label: 'Openrouter',
+        });
     }
 
     if (env.ANTHROPIC_API_KEY) {
@@ -186,7 +191,8 @@ function buildProviders<T>(schema: z.ZodType<T>, name: string, fast: boolean) {
 function wrapNullGuard<T>(chain: StructuredChain<T>, label: string): StructuredChain<T> {
     return RunnableLambda.from(async (input: BaseLanguageModelInput): Promise<T> => {
         const result = await chain.invoke(input);
-        if (result == null) throw new Error(`Provider ${label} returned null — no structured output`);
+        if (result == null)
+            throw new Error(`Provider ${label} returned null — no structured output`);
         return result;
     }) as unknown as StructuredChain<T>;
 }

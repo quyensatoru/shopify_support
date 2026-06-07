@@ -90,7 +90,8 @@ export async function runPlanReasoning(input: PlanInput): Promise<{
     // Build code context section (grounded facts — no hallucination allowed)
     const codeContextSummary = (input.codeContexts ?? [])
         .map((ctx) => {
-            const symbols = ctx.relevantSymbols.slice(0, 15)
+            const symbols = ctx.relevantSymbols
+                .slice(0, 15)
                 .map((s) => `  ${s.kind} ${s.name} @ ${s.file}${s.line ? `:${s.line}` : ''}`)
                 .join('\n');
             const markers = ctx.expectedMarkers.length
@@ -101,7 +102,9 @@ export async function runPlanReasoning(input: PlanInput): Promise<{
                 ctx.contextMarkdown.slice(0, 2000),
                 symbols ? `Relevant symbols:\n${symbols}` : '',
                 markers,
-            ].filter(Boolean).join('\n');
+            ]
+                .filter(Boolean)
+                .join('\n');
         })
         .join('\n\n');
 

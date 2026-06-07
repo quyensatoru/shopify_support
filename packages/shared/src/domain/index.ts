@@ -68,9 +68,9 @@ export const ProbeTargetSchema = z.object({
     glob: z.string().optional(),
     regex: z.string().optional(),
     // code — codegraph actions (find_symbol, find_callers, find_callees, impact, build_context)
-    symbol: z.string().optional(),   // symbol name to look up
-    nodeId: z.string().optional(),   // node ID for caller/callee/impact
-    depth: z.number().optional(),    // traversal depth
+    symbol: z.string().optional(), // symbol name to look up
+    nodeId: z.string().optional(), // node ID for caller/callee/impact
+    depth: z.number().optional(), // traversal depth
     // database — sql table, mongo collection, raw query
     source: z.string().optional(),
     table: z.string().optional(),

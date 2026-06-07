@@ -84,7 +84,9 @@ export const AppConfigWriteSchema = z.object({
             }),
         )
         .optional(),
-    gitlab: z.object({ baseUrl: z.string(), token: z.string(), groupId: z.string().optional() }).optional(),
+    gitlab: z
+        .object({ baseUrl: z.string(), token: z.string(), groupId: z.string().optional() })
+        .optional(),
     dbSources: z
         .array(
             z.object({

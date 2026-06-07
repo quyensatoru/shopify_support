@@ -1,5 +1,10 @@
 import type { SupportStateType } from '../state.js';
-import { ensureIndex, buildRepoContext, detectExpectedMarkers, searchSymbols } from '../../connectors/codegraph.js';
+import {
+    ensureIndex,
+    buildRepoContext,
+    detectExpectedMarkers,
+    searchSymbols,
+} from '../../connectors/codegraph.js';
 import { retrieveAppKnowledge, learnApp, hasAppKnowledge } from '../../knowledge/index.js';
 import { stepLog } from '../utils.js';
 import { getEnv } from '../../env.js';
@@ -37,7 +42,11 @@ export async function gatherContextNode(state: SupportStateType) {
                               buildRepoContext(cg, request.issueText),
                               Promise.resolve(detectExpectedMarkers(cg)),
                               Promise.resolve(
-                                  searchSymbols(cg, request.issueText.split(' ').slice(0, 3).join(' '), 10),
+                                  searchSymbols(
+                                      cg,
+                                      request.issueText.split(' ').slice(0, 3).join(' '),
+                                      10,
+                                  ),
                               ),
                           ]);
                           const frameworks = cg.getDetectedFrameworks();
@@ -54,7 +63,10 @@ export async function gatherContextNode(state: SupportStateType) {
                               expectedMarkers: markers,
                           };
                       } catch (err) {
-                          logger.error({ err, repo: repo.name }, 'gather_context: codegraph failed for repo');
+                          logger.error(
+                              { err, repo: repo.name },
+                              'gather_context: codegraph failed for repo',
+                          );
                           return null;
                       }
                   }),
@@ -65,11 +77,11 @@ export async function gatherContextNode(state: SupportStateType) {
         (async (): Promise<AppKnowledgeChunk[]> => {
             try {
                 const known = await hasAppKnowledge(appKey);
-                const hasSource = appConfig && (
-                    (appConfig.docUrls ?? []).length > 0 ||
-                    !!appConfig.homepage ||
-                    !!appConfig.appStoreUrl
-                );
+                const hasSource =
+                    appConfig &&
+                    ((appConfig.docUrls ?? []).length > 0 ||
+                        !!appConfig.homepage ||
+                        !!appConfig.appStoreUrl);
                 if (!known && hasSource && appConfig) {
                     logger.info({ appKey }, 'gather_context: first run — learning app inline');
                     await learnApp(appKey, appConfig);
@@ -77,7 +89,10 @@ export async function gatherContextNode(state: SupportStateType) {
                 const chunks = await retrieveAppKnowledge(appKey, request.issueText, 5);
                 return chunks ?? [];
             } catch (err) {
-                logger.warn({ err, appKey }, 'gather_context: appKnowledge retrieval failed (non-fatal)');
+                logger.warn(
+                    { err, appKey },
+                    'gather_context: appKnowledge retrieval failed (non-fatal)',
+                );
                 return [];
             }
         })(),

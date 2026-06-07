@@ -96,9 +96,18 @@ export async function learnApp(appKey: string, config: ResolvedAppConfig): Promi
         try {
             const page = await renderPage(config.homepage);
             const body = page.html.replace(/<[^>]+>/g, ' ').slice(0, 8_000);
-            total += await storeChunks(appKey, 'doc_url', config.homepage, page.title || config.homepage, body);
+            total += await storeChunks(
+                appKey,
+                'doc_url',
+                config.homepage,
+                page.title || config.homepage,
+                body,
+            );
         } catch (err) {
-            logger.warn({ err, url: config.homepage }, 'learnApp: renderPage failed for homepage (non-fatal)');
+            logger.warn(
+                { err, url: config.homepage },
+                'learnApp: renderPage failed for homepage (non-fatal)',
+            );
         }
     }
 
@@ -107,9 +116,18 @@ export async function learnApp(appKey: string, config: ResolvedAppConfig): Promi
         try {
             const page = await renderPage(config.appStoreUrl);
             const body = page.html.replace(/<[^>]+>/g, ' ').slice(0, 8_000);
-            total += await storeChunks(appKey, 'app_store', config.appStoreUrl, page.title || 'App Store', body);
+            total += await storeChunks(
+                appKey,
+                'app_store',
+                config.appStoreUrl,
+                page.title || 'App Store',
+                body,
+            );
         } catch (err) {
-            logger.warn({ err, url: config.appStoreUrl }, 'learnApp: renderPage failed for appStoreUrl (non-fatal)');
+            logger.warn(
+                { err, url: config.appStoreUrl },
+                'learnApp: renderPage failed for appStoreUrl (non-fatal)',
+            );
         }
     }
 
@@ -124,7 +142,10 @@ export async function retrieveAppKnowledge(
 ): Promise<AppKnowledgeChunk[] | null> {
     const vec = await embed(issueText);
     if (!vec) {
-        logger.warn({ appKey }, 'retrieveAppKnowledge: embed returned null — skipping (no OPENAI_API_KEY)');
+        logger.warn(
+            { appKey },
+            'retrieveAppKnowledge: embed returned null — skipping (no OPENAI_API_KEY)',
+        );
         return null;
     }
 
