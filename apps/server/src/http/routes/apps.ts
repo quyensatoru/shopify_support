@@ -7,7 +7,7 @@ import {
     getAppConfig,
     countAppKnowledge,
 } from '../../db/repo/index.js';
-import { learnApp } from '../../knowledge/index.js';
+import { learnApp, type LearnStep } from '../../knowledge/index.js';
 import { resolveAppConfig } from '../../config/index.js';
 import { encrypt } from '../../config/crypto.js';
 import { SqlAdapter } from '../../connectors/db/sql.adapter.js';
@@ -236,13 +236,29 @@ router.post('/apps/:appKey/learn', async (req, res) => {
         return;
     }
     const config = resolveAppConfig(row);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const send = (ev: LearnStep | { type: 'final'; newChunks: number; totalChunks: number } | { type: 'error'; message: string }) => {
+        res.write(`data: ${JSON.stringify(ev)}\n\n`);
+        // @ts-expect-error flush exists on compressed responses
+        if (typeof res.flush === 'function') res.flush();
+    };
+
     try {
-        const chunks = await learnApp(appKey, config);
-        const total = await countAppKnowledge(appKey);
-        res.json({ ok: true, newChunks: chunks, totalChunks: total });
+        const newChunks = await learnApp(appKey, config, send);
+        const totalChunks = await countAppKnowledge(appKey);
+        send({ type: 'final', newChunks, totalChunks });
     } catch (err) {
-        res.status(500).json({ error: String(err) });
+        send({ type: 'error', message: String(err) });
     }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
 });
 
 function encryptConfigSecrets(body: Record<string, unknown>): Record<string, unknown> {

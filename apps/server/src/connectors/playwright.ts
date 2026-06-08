@@ -11,6 +11,13 @@ export type PageSignals = {
     responseHeaders: Record<string, string>;
 };
 
+export class DevLoginRequiredError extends Error {
+    constructor(public readonly pageUrl: string) {
+        super(`Dev store login required: ${pageUrl}`);
+        this.name = 'DevLoginRequiredError';
+    }
+}
+
 let _browser: Browser | undefined;
 
 async function getBrowser(): Promise<Browser> {
@@ -20,7 +27,7 @@ async function getBrowser(): Promise<Browser> {
     return _browser;
 }
 
-export async function renderPage(url: string): Promise<PageSignals> {
+export async function renderPage(url: string, devPassword?: string): Promise<PageSignals> {
     const browser = await getBrowser();
     const context = await browser.newContext({
         userAgent: 'ShopifySupportAgent/1.0',
@@ -30,7 +37,6 @@ export async function renderPage(url: string): Promise<PageSignals> {
 
     const consoleErrors: string[] = [];
     const networkErrors: string[] = [];
-    let isShopify = null;
 
     page.on('console', (msg) => {
         if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -45,12 +51,29 @@ export async function renderPage(url: string): Promise<PageSignals> {
     let responseHeaders: Record<string, string> = {};
     try {
         const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 20_000 });
-        //simulator console tab
-        const shopify = await page.evaluate(() => window?.Shopify);
+        const shopify = await page.evaluate<unknown>(`window.Shopify`);
+
+        if (!shopify) {
+            const isPasswordPage = await page.evaluate<boolean>(
+                `!!(document.querySelector('input[type="password"]') || document.querySelector('form[action*="password"]'))`,
+            );
+
+            if (isPasswordPage) {
+                console.log("devPassword: ", devPassword)
+                if (!devPassword) {
+                    await context.close();
+                    throw new DevLoginRequiredError(url);
+                }
+                await page.locator('input[type="password"]').first().fill(devPassword);
+                await page.locator('[type="submit"]').first().click();
+                await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+            }
+        }
 
         status = response?.status() ?? 0;
         responseHeaders = (response?.headers() ?? {}) as Record<string, string>;
-    } catch {
+    } catch (err) {
+        if (err instanceof DevLoginRequiredError) throw err;
         status = 0;
     }
 

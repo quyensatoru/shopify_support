@@ -133,7 +133,7 @@ Instructions:
 3. Generate 2-4 concrete, testable hypotheses ranked by likelihood.
 4. For each hypothesis: state what would CONFIRM it (observable signals) and what would REJECT it.
 5. Generate specific probes (investigation actions) targeting the most likely surfaces.
-   - surface options: code | database | logs | shopify | browser | config
+   - surface options: code | database | logs | shopify | browser | confign
    - Only include probes for surfaces that are configured or have the storeDomain/URL available.
    - Probe target should be specific (e.g., for code: glob="**/*.ts", regex="sessionToken|appBridge"; for database: collection="shops", query="shop_domain = ?").
 6. List any missing context that would improve the investigation (e.g., "need store URL to run browser probe").

@@ -642,6 +642,7 @@ function AppConfigTab() {
     const [repoFetchError, setRepoFetchError] = useState<string | null>(null);
     const [learning, setLearning] = useState(false);
     const [learnMsg, setLearnMsg] = useState<string | null>(null);
+    const [learnSteps, setLearnSteps] = useState<{ type: string; message: string; url?: string; chunks?: number }[]>([]);
 
     const loadApps = useCallback(() => {
         apiFetch<{ apps: AppSummary[] }>('/apps')
@@ -843,12 +844,35 @@ function AppConfigTab() {
         if (!selectedKey) return;
         setLearning(true);
         setLearnMsg(null);
+        setLearnSteps([]);
         try {
-            const d = await apiFetch<{ newChunks: number; totalChunks: number }>(
-                `/apps/${selectedKey}/learn`,
-                { method: 'POST' },
-            );
-            setLearnMsg(`Learned ${d.newChunks} new chunks (${d.totalChunks} total)`);
+            const response = await fetch(`${API}/apps/${selectedKey}/learn`, { method: 'POST' });
+            if (!response.ok || !response.body) throw new Error(await response.text());
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, { stream: true });
+                const lines = buf.split('\n');
+                buf = lines.pop() ?? '';
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const data = line.slice(6).trim();
+                    if (data === '[DONE]') break;
+                    try {
+                        const ev = JSON.parse(data) as { type: string; message?: string; newChunks?: number; totalChunks?: number; url?: string; chunks?: number };
+                        if (ev.type === 'final') {
+                            setLearnMsg(`Learned ${ev.newChunks} new chunks (${ev.totalChunks} total)`);
+                        } else if (ev.type === 'error') {
+                            setLearnMsg(`Error: ${ev.message}`);
+                        } else {
+                            setLearnSteps((prev) => [...prev, ev as { type: string; message: string; url?: string; chunks?: number }]);
+                        }
+                    } catch {}
+                }
+            }
         } catch (err) {
             setLearnMsg(`Error: ${String(err)}`);
         }
@@ -1252,6 +1276,47 @@ function AppConfigTab() {
                                     )}
                                 </div>
                             )}
+                        </div>
+                        {learnSteps.length > 0 && (
+                            <div
+                                style={{
+                                    marginBottom: 10,
+                                    background: '#f9fafb',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: 4,
+                                    padding: '8px 10px',
+                                    maxHeight: 200,
+                                    overflowY: 'auto',
+                                    fontSize: 11,
+                                    fontFamily: 'monospace',
+                                }}
+                            >
+                                {learnSteps.map((step, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            marginBottom: 2,
+                                            color:
+                                                step.type === 'stored'
+                                                    ? '#166534'
+                                                    : step.type === 'skipped'
+                                                      ? '#92400e'
+                                                      : step.type === 'done'
+                                                        ? '#1d4ed8'
+                                                        : '#374151',
+                                        }}
+                                    >
+                                        {step.type === 'stored' && '✓ '}
+                                        {step.type === 'crawling' && '↓ '}
+                                        {step.type === 'skipped' && '— '}
+                                        {step.type === 'searching' && '⌕ '}
+                                        {step.type === 'done' && '✦ '}
+                                        {step.message}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div style={{ display: 'none' }}>{/* spacer placeholder */}
                         </div>
                         <div
                             style={{

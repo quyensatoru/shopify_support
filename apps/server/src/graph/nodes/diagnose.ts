@@ -1,5 +1,6 @@
 import type { SupportStateType } from '../state.js';
 import type { Probe, ProbeResult, Evidence } from '@shopify-support/shared';
+import { isGraphInterrupt } from '@langchain/langgraph';
 import { dispatchInvestigator } from '../../investigators/index.js';
 import { stepLog } from '../utils.js';
 import { randomUUID } from 'node:crypto';
@@ -46,17 +47,20 @@ export async function diagnoseNode(state: SupportStateType) {
     const results = await Promise.all(
         batch.map((probe) =>
             dispatchInvestigator(probe, state.appConfig, state.request, state.codeContexts).catch(
-                (err): ProbeResult => ({
-                    probeId: probe.id,
-                    surface: probe.surface,
-                    action: probe.action,
-                    status: 'failed',
-                    found: false,
-                    data: null,
-                    reason: String(err),
-                    provenance: `${probe.surface}:${probe.action}`,
-                    durationMs: 0,
-                }),
+                (err): ProbeResult => {
+                    if (isGraphInterrupt(err)) throw err;
+                    return {
+                        probeId: probe.id,
+                        surface: probe.surface,
+                        action: probe.action,
+                        status: 'failed',
+                        found: false,
+                        data: null,
+                        reason: String(err),
+                        provenance: `${probe.surface}:${probe.action}`,
+                        durationMs: 0,
+                    };
+                },
             ),
         ),
     );

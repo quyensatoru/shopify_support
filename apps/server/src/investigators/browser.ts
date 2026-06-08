@@ -1,5 +1,7 @@
 import type { Probe, ProbeResult, RunRequest, CodeContext } from '@shopify-support/shared';
-import { renderPage } from '../connectors/playwright.js';
+import { interrupt, isGraphInterrupt } from '@langchain/langgraph';
+import { renderPage, DevLoginRequiredError, type PageSignals } from '../connectors/playwright.js';
+import * as fs from "fs"
 
 function extractCspFrameAncestors(headers: Record<string, string>): string | null {
     const csp =
@@ -41,8 +43,18 @@ export async function investigateBrowser(
     }
 
     try {
-        const page = await renderPage(url);
-
+        let page: PageSignals;
+        try {
+            page = await renderPage(url);
+        } catch (err) {
+            if (!(err instanceof DevLoginRequiredError)) throw err;
+            const password = interrupt({
+                reason: 'need_context',
+                question: `Dev store password required to access: ${url}`,
+            }) as { answer: string };
+            page = await renderPage(url, password?.answer);
+        }
+        fs.writeFileSync("web_search.txt", JSON.stringify(page, null, 2), 'utf8')
         const frameAncestors = extractCspFrameAncestors(page.responseHeaders);
         const appBridgePresent = detectAppBridge(page.scripts, page.html);
         const networkIssues = network4xxOr5xx(page.networkErrors);
@@ -101,6 +113,7 @@ export async function investigateBrowser(
             provenance: `browser:${url}`,
         };
     } catch (err) {
+        if (isGraphInterrupt(err)) throw err;
         return {
             ...base,
             status: 'failed',

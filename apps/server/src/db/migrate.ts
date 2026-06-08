@@ -77,7 +77,7 @@ const MIGRATIONS = [
     confidence VARCHAR(8) NOT NULL,
     source_run_id VARCHAR(128) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    embedding vector(1536)
+    embedding vector(2048)
   )`,
     `CREATE INDEX IF NOT EXISTS case_memories_app_idx ON case_memories(app)`,
     `CREATE INDEX IF NOT EXISTS case_memories_case_type_idx ON case_memories(case_type)`,
@@ -104,7 +104,7 @@ const MIGRATIONS = [
     url TEXT,
     title TEXT NOT NULL,
     chunk TEXT NOT NULL,
-    embedding vector(1536),
+    embedding vector(2048),
     content_hash VARCHAR(64) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,

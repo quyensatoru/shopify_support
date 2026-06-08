@@ -15,7 +15,7 @@ export const CaseTypeSchema = z.enum([
 ]);
 export type CaseType = z.infer<typeof CaseTypeSchema>;
 
-export const SurfaceSchema = z.enum(['code', 'database', 'logs', 'shopify', 'browser', 'config']);
+export const SurfaceSchema = z.enum(['code', 'database', 'logs', 'shopify', 'browser', 'config', 'rabbitmq']);
 export type Surface = z.infer<typeof SurfaceSchema>;
 
 export const SeveritySchema = z.enum(['low', 'normal', 'high', 'urgent']);

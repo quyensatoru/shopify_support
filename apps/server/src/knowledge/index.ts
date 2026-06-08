@@ -1,15 +1,14 @@
 /**
  * App knowledge: learn from the web / docs and retrieve via pgvector.
  *
- * learnApp(appKey, config):
+ * learnApp(appKey, config, onStep?):
  *   1. Tavily web search on app name
- *   2. Crawl docUrls / homepage / appStoreUrl via playwright
- *   3. Chunk each page → embed → store in app_knowledge (dedup by content_hash)
+ *   2. Crawl docUrls via playwright, following same-domain links up to MAX_SUBPAGES deep
+ *   3. Crawl homepage / appStoreUrl
+ *   4. Chunk each page → embed → store in app_knowledge (dedup by content_hash)
  *
  * retrieveAppKnowledge(appKey, issueText, k):
  *   pgvector cosine similarity search, returns null if no embedding available.
- *
- * No fallback — if embedding is unavailable, return skip with reason.
  */
 
 import { createHash } from 'node:crypto';
@@ -26,8 +25,16 @@ import type { ResolvedAppConfig } from '@shopify-support/shared';
 import type { AppKnowledgeChunk } from '@shopify-support/shared';
 import { logger } from '../observability/logger.js';
 
-const CHUNK_SIZE = 800; // chars per chunk
-const MAX_CHUNKS_PER_SOURCE = 6;
+const CHUNK_SIZE = 800;
+const MAX_CHUNKS_PER_SOURCE = 10;
+const MAX_SUBPAGES = 4; // sub-links to follow per docUrl
+
+export type LearnStep =
+    | { type: 'searching'; message: string }
+    | { type: 'crawling'; url: string; message: string }
+    | { type: 'stored'; url: string; chunks: number; message: string }
+    | { type: 'skipped'; url: string; message: string }
+    | { type: 'done'; total: number; message: string };
 
 function chunkText(text: string): string[] {
     const chunks: string[] = [];
@@ -44,6 +51,49 @@ function contentHash(text: string): string {
     return createHash('sha256').update(text).digest('hex').slice(0, 64);
 }
 
+// Strip scripts/styles then tags, normalize whitespace.
+function extractText(html: string, maxChars: number): string {
+    return html
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, maxChars);
+}
+
+// Extract same-origin links from HTML, limited to MAX_SUBPAGES unique paths.
+function extractDocLinks(html: string, baseUrl: string): string[] {
+    let base: URL;
+    try {
+        base = new URL(baseUrl);
+    } catch {
+        return [];
+    }
+    const seen = new Set<string>();
+    const results: string[] = [];
+    const re = /href=["']([^"']+)["']/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(html)) !== null) {
+        try {
+            const abs = new URL(m[1]!, baseUrl);
+            // Same origin, different path, no fragments, no query-only diffs
+            if (
+                abs.origin === base.origin &&
+                abs.pathname !== base.pathname &&
+                abs.pathname !== '/' &&
+                !abs.pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|pdf|zip|css|js)$/i) &&
+                !seen.has(abs.pathname)
+            ) {
+                seen.add(abs.pathname);
+                results.push(abs.href.split('#')[0]!);
+                if (results.length >= MAX_SUBPAGES) break;
+            }
+        } catch {}
+    }
+    return results;
+}
+
 async function storeChunks(
     appKey: string,
     source: string,
@@ -51,7 +101,7 @@ async function storeChunks(
     title: string,
     body: string,
 ): Promise<number> {
-    const chunks = chunkText(body.replace(/\s+/g, ' ').trim());
+    const chunks = chunkText(body);
     let stored = 0;
     for (const chunk of chunks) {
         const hash = contentHash(`${appKey}:${source}:${chunk}`);
@@ -69,68 +119,86 @@ async function storeChunks(
     return stored;
 }
 
-export async function learnApp(appKey: string, config: ResolvedAppConfig): Promise<number> {
+export async function learnApp(
+    appKey: string,
+    config: ResolvedAppConfig,
+    onStep?: (step: LearnStep) => void,
+): Promise<number> {
+    const emit = (step: LearnStep) => onStep?.(step);
     let total = 0;
 
     // 1. Tavily web search
-    const searchResults = await tavilySearch(`${config.name} Shopify app documentation`, 5);
-    if (searchResults) {
-        for (const r of searchResults) {
-            total += await storeChunks(appKey, 'web_search', r.url, r.title, r.content);
+    emit({ type: 'searching', message: `Searching web: "${config.name} Shopify app documentation"` });
+    try {
+        const searchResults = await tavilySearch(`${config.name} Shopify app documentation`, 5);
+        if (searchResults) {
+            for (const r of searchResults) {
+                const n = await storeChunks(appKey, 'web_search', r.url, r.title, r.content);
+                total += n;
+                emit({ type: 'stored', url: r.url ?? '', chunks: n, message: `[search] ${r.title} — ${n} chunks` });
+            }
         }
+    } catch (err) {
+        logger.warn({ err }, 'learnApp: tavilySearch failed (non-fatal)');
     }
 
-    // 2. Crawl docUrls
+    // Shared crawl helper: renders a page, stores chunks, optionally follows sub-links.
+    const crawlPage = async (
+        url: string,
+        source: 'doc_url' | 'app_store',
+        maxText: number,
+        followLinks: boolean,
+    ) => {
+        emit({ type: 'crawling', url, message: `Crawling ${url}` });
+        let page;
+        try {
+            page = await renderPage(url);
+        } catch (err) {
+            emit({ type: 'skipped', url, message: `Skipped ${url}: ${String(err).slice(0, 80)}` });
+            logger.warn({ err, url }, 'learnApp: renderPage failed (non-fatal)');
+            return;
+        }
+
+        const body = extractText(page.html, maxText);
+        const n = await storeChunks(appKey, source, url, page.title || url, body);
+        total += n;
+        emit({ type: 'stored', url, chunks: n, message: `[${source}] ${page.title || url} — ${n} chunks` });
+
+        if (!followLinks) return;
+
+        // Follow same-domain links
+        const subLinks = extractDocLinks(page.html, url);
+        for (const link of subLinks) {
+            emit({ type: 'crawling', url: link, message: `  → ${link}` });
+            try {
+                const sub = await renderPage(link);
+                const subBody = extractText(sub.html, maxText);
+                const sn = await storeChunks(appKey, source, link, sub.title || link, subBody);
+                total += sn;
+                emit({ type: 'stored', url: link, chunks: sn, message: `  → [${source}] ${sub.title || link} — ${sn} chunks` });
+            } catch (err) {
+                emit({ type: 'skipped', url: link, message: `  → Skipped ${link}: ${String(err).slice(0, 60)}` });
+                logger.warn({ err, link }, 'learnApp: sub-page crawl failed (non-fatal)');
+            }
+        }
+    };
+
+    // 2. Crawl docUrls (with sub-link following)
     for (const url of config.docUrls ?? []) {
-        try {
-            const page = await renderPage(url);
-            const body = page.html.replace(/<[^>]+>/g, ' ').slice(0, 12_000);
-            total += await storeChunks(appKey, 'doc_url', url, page.title || url, body);
-        } catch (err) {
-            logger.warn({ err, url }, 'learnApp: renderPage failed for docUrl (non-fatal)');
-        }
+        await crawlPage(url, 'doc_url', 12_000, true);
     }
 
-    // 3. Crawl homepage
+    // 3. Homepage (no sub-links — usually marketing, not docs)
     if (config.homepage) {
-        try {
-            const page = await renderPage(config.homepage);
-            const body = page.html.replace(/<[^>]+>/g, ' ').slice(0, 8_000);
-            total += await storeChunks(
-                appKey,
-                'doc_url',
-                config.homepage,
-                page.title || config.homepage,
-                body,
-            );
-        } catch (err) {
-            logger.warn(
-                { err, url: config.homepage },
-                'learnApp: renderPage failed for homepage (non-fatal)',
-            );
-        }
+        await crawlPage(config.homepage, 'doc_url', 8_000, false);
     }
 
-    // 4. Crawl app store URL
+    // 4. App store page
     if (config.appStoreUrl) {
-        try {
-            const page = await renderPage(config.appStoreUrl);
-            const body = page.html.replace(/<[^>]+>/g, ' ').slice(0, 8_000);
-            total += await storeChunks(
-                appKey,
-                'app_store',
-                config.appStoreUrl,
-                page.title || 'App Store',
-                body,
-            );
-        } catch (err) {
-            logger.warn(
-                { err, url: config.appStoreUrl },
-                'learnApp: renderPage failed for appStoreUrl (non-fatal)',
-            );
-        }
+        await crawlPage(config.appStoreUrl, 'app_store', 8_000, false);
     }
 
+    emit({ type: 'done', total, message: `Done — ${total} chunks stored` });
     logger.info({ appKey, total }, 'learnApp: complete');
     return total;
 }
