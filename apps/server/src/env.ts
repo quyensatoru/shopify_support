@@ -27,6 +27,7 @@ const schema = z
             .default('true'),
         WORKSPACE_DIR: z.string().default('./workspace'),
         TAVILY_API_KEY: z.string().min(1).optional(),
+        FIRECRAWL_API_KEY: z.string().min(1).optional(),
         EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
     })
     .refine((d) => Boolean(d.ANTHROPIC_API_KEY ?? d.OPENAI_API_KEY), {
