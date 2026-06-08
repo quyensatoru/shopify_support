@@ -14,6 +14,7 @@ import { SqlAdapter } from '../../connectors/db/sql.adapter.js';
 import { RedisAdapter } from '../../connectors/db/redis.adapter.js';
 import { RabbitMQAdapter } from '../../connectors/db/rabbitmq.adapter.js';
 import { shopifyAdminQuery } from '../../connectors/shopify.js';
+import { MongoAdapter } from '../../connectors/db/mongo.adapter.js';
 
 const router = Router();
 
@@ -118,8 +119,17 @@ router.post('/apps/:appKey/config/test', async (req, res) => {
                 ok = info !== null;
                 message = ok ? 'management API reachable' : 'management API unreachable';
             } else if (src.type === 'mongo') {
-                ok = false;
-                message = 'mongo test not implemented';
+                const adapter = new MongoAdapter(src.connectionString);
+                const health = await adapter.healthCheck()
+                
+                if(health){
+                    await adapter.close();
+                    ok = true;
+                    message = 'connected';
+                } else {
+                    ok = false;
+                    message = 'mongo test faild';
+                }
             }
         } catch (err) {
             ok = false;

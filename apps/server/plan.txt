@@ -1,0 +1,448 @@
+You are a Shopify embedded app support engineer. Analyze this issue and produce a structured investigation plan.
+LANGUAGE RULE: Detect the language of the Issue text and write ALL text output fields in that same language. Do not translate code identifiers, file paths, or technical names.
+
+App: mida
+Issue: Khách báo ko có record trong ngày hôm nay. check xem nguyên nhân do đâu sao lại ko có traffic trong ngày hôm nay 
+Store: dev-quyen-blocker-plus.myshopify.com
+Store URL: https://dev-quyen-blocker-plus.myshopify.com/
+
+Repos: sama-proxy, sama-extensions, sama-recorder, sama-search, sama-hm, sama-api, sama-cms | DB sources: api-db(mongo), rabbitmq(rabbitmq), redis(redis), heatmap-db(mongo), recorder-db(mongo), proxy-db(mongo) | Shopify: not configured
+
+
+=== CODEBASE CONTEXT (grounded facts from code index) ===
+--- Repo: sama-proxy (express) ---
+## Code Context
+
+**Query:** Khách báo ko có record trong ngày hôm nay. check xem nguyên nhân do đâu sao lại ko có traffic trong ngày hôm nay 
+
+### Entry Points
+
+- **pingRouter** (constant) - src/routes/ping.route.js:8
+  `= new Router({
+    prefix: '/recorder',
+})`
+
+### Code
+
+#### pingRouter (src/routes/ping.route.js:8)
+
+```javascript
+export const pingRouter = new Router({
+    prefix: '/recorder',
+});
+```
+
+
+### ⚠️ Low-confidence match
+
+This query matched mostly on common words, so the entry points above may be off-target — treat them as a starting point, not a complete answer. For a reliable result:
+- `codegraph_explore` with the **exact symbol names** you are after (class / function / method names), or
+- `codegraph_search <name>` for one specific symbol
+- `codegraph_files` a likely area: `src/routes`
+
+Do not assume the list above is comprehensive.
+Relevant symbols:
+  constant app @ src/server.js:14
+  import koa @ src/server.js:5
+  import koa-proxies @ src/routes/event.route.js:2
+  import koa-static @ src/server.js:6
+  import @koa/router @ src/routes/api.route.js:1
+  import koa-proxies @ src/routes/api.route.js:2
+  import @koa/router @ src/routes/crm.route.js:1
+  import koa-proxies @ src/routes/crm.route.js:3
+  import @koa/router @ src/routes/event.route.js:1
+  import @koa/router @ src/routes/hm.route.js:1
+
+--- Repo: sama-extensions (express) ---
+## Code Context
+
+**Query:** Khách báo ko có record trong ngày hôm nay. check xem nguyên nhân do đâu sao lại ko có traffic trong ngày hôm nay 
+
+### Entry Points
+
+- **record** (function) - scripts/rrweb/record/index.js:21
+  `(options = {})`
+- **checkoutStartedHandler** (function) - extensions/web-pixel/src/events /checkout_started.js:4
+  `({ event, init, settings, browser })`
+- **checkoutCompletedHandler** (function) - extensions/web-pixel/src/events /checkout_completed.js:22
+  `({ event, init, settings, browser })`
+
+### Related Symbols
+
+- extensions/web-pixel/src/helpers/application-store.helper.js: loadVisitor:67, loadSession:45, loadPage:79, getCartInfo:136
+- extensions/web-pixel/src/helpers/send_event.js: createPingQuery:4, sendEvent:22
+- extensions/web-pixel/src/events /checkout_completed.js: groupProductOrdered:4
+- scripts/rrweb/record/error-handler.js: registerErrorHandler:2
+- scripts/rrweb/rrweb-snapshot/utils.js: reset:123
+- scripts/rrweb/utils.js: polyfill:223
+
+### Code
+
+#### record (scripts/rrweb/record/index.js:21)
+
+```javascript
+function record(options = {}) {
+    // mr_00002
+    window.msrRecord = {
+        externalCDNs: []
+    }
+    const { emit, checkoutEveryNms, checkoutEveryNth, blockClass = 'rr-block', blockSelector = null, ignoreClass = 'rr-ignore', ignoreSelector = null, maskTextClass = 'rr-mask', maskTextSelector = null, inlineStylesheet = true, maskAllInputs, maskInputOptions: _maskInputOptions, slimDOMOptions: _slimDOMOptions, maskInputFn, maskTextFn, hooks, packFn, sampling = {}, dataURLOptions = {}, mousemoveWait, recordDOM = true, recordCanvas = false, recordCrossOriginIframes = false, recordAfter = options.recordAfter === 'DOMContentLoaded'
+        ? options.recordAfter
+        : 'load', userTriggeredOnInput = false, collectFonts = false, inlineImages = false, plugins, keepIframeSrcFn = () => false, ignoreCSSAttributes = new Set([]), errorHandler, } = options;
+    registerErrorHandler(errorHandler);
+    const inEmittingFrame = recordCrossOr
+Relevant symbols:
+  method setupPeriodicSnapshot @ scripts/rrweb/record/dynamic-dom-handler.js:267
+  import koa @ server/index.js:1
+  import koa-static @ server/index.js:2
+  constant app @ server/index.js:5
+
+--- Repo: sama-recorder (express) ---
+## Code Context
+
+**Query:** Khách báo ko có record trong ngày hôm nay. check xem nguyên nhân do đâu sao lại ko có traffic trong ngày hôm nay 
+
+### Entry Points
+
+- **checkSearchEngines** (function) - helpers/session.helper.js:28
+  `(url)`
+- **checkIpIncludeCIDRRange** (function) - helpers/ipAddress.helper.js:8
+  `(ipAddress, addressCIDR)`
+- **checkIpExcludeInArrayCIDRRange** (function) - helpers/ipAddress.helper.js:16
+  `(arrayCIDRRange, ip)`
+
+### Related Symbols
+
+- helpers/ipAddress.helper.js: ipRangeCheck:1
+
+### Code
+
+#### checkSearchEngines (helpers/session.helper.js:28)
+
+```javascript
+const checkSearchEngines = (url) => {
+    for (const searchEngine of SEARCH_ENGINES) {
+        if (url && url.startsWith(searchEngine)) {
+            return true;
+        }
+    }
+    return false;
+};
+```
+
+#### checkIpIncludeCIDRRange (helpers/ipAddress.helper.js:8)
+
+```javascript
+function checkIpIncludeCIDRRange(ipAddress, addressCIDR) {
+    if (!IPCIDR.isValidCIDR(addressCIDR)) {
+        return false;
+    } else {
+        return ipRangeCheck(ipAddress, addressCIDR);
+    }
+}
+```
+
+#### checkIpExcludeInArrayCIDRRange (helpers/ipAddress.helper.js:16)
+
+```javascript
+function checkIpExcludeInArrayCIDRRange(arrayCIDRRange, ip) {
+    if (arrayCIDRRange && arrayCIDRRange.length > 0) {
+        let isResult = false;
+        for (let i = 0; i < arrayCIDRRange.length; i++) {
+            if (checkIpIncludeCIDRRange(ip, arrayCIDRRange[i])) {
+                isResult = true;
+                break;
+            }
+        }
+        return isResult;
+    } else {
+        return false;
+    }
+}
+```
+
+
+## Call paths
+
+Execution flow among the key symbols (traced through the call graph):
+
+- checkIpExcludeInArrayCIDRRange → checkIpIncludeCIDRRange → ipRangeCheck
+
+_codegraph_node any symbol above for its source + its own callers/callees._
+
+
+### ⚠️ Low-confidence match
+
+This query matched mostly on common words, so the entry points above may be off-target — treat them as a starting point, not a complete answer.
+Relevant symbols:
+  constant Koa @ server.js:3
+  constant koaBody @ server.js:5
+  constant app @ server.js:16
+  constant Router @ routes/index.js:1
+  constant Router @ routes/session.route.js:1
+  constant cors @ server.js:7
+
+--- Repo: sama-search (express) ---
+## Code Context
+
+**Query:** Khách báo ko có record trong ngày hôm nay. check xem nguyên nhân do đâu sao lại ko có traffic trong ngày hôm nay 
+
+### Entry Points
+
+- **POST /top_paid_traffic_sources** (route) - src/routes/session.route.js:9
+- **ABANDONED_CHECKOUT** (constant) - src/constant/session.js:51
+  `= 'abandoned-checkout'`
+
+### Code
+
+#### POST /top_paid_traffic_sources (src/routes/session.route.js:9)
+
+```javascript
+router.post("/top_paid_traffic_sources", SessionController.topPaidTrafficSources);
+```
+
+#### ABANDONED_CHECKOUT (src/constant/session.js:51)
+
+```javascript
+const ABANDONED_CHECKOUT = 'abandoned-checkout';
+```
+
+
+### ⚠️ Low-confidence match
+
+This query matched mostly on common words, so the entry points above may be off-target — treat them as a starting point, not a complete answer. For a reliable result:
+- `codegraph_explore` with the **exact symbol names** you are after (class / function / method names), or
+- `codegraph_search <name>` for one specific symbol
+- `codegraph_files` a likely area: `src/routes`, `src/constant`
+
+Do not assume the list above is comprehensive.
+
+--- Repo: sama-hm (express) ---
+## Code Context
+
+**Query:** Khách báo ko có record trong ngày hôm nay. check xem nguyên nhân do đâu sao lại ko có traffic trong ngày hôm nay 
+
+### Entry Points
+
+- **CHECKOUT** (constant) - src/helpers/event.helper.js:8
+  `= 'checkout-begin'`
+- **PURCHASE** (constant) - src/helpers/event.helper.js:7
+  `= 'checkout'`
+- **CONVERSION_TYPES** (constant) - src/models/heatmap/click.heatmap.js:5
+  `= [
+    'add-to-cart',
+    'begin_checkout',
+    'abandoned_checkout',
+    'abandoned_cart',
+    'chec...`
+
+### Code
+
+#### CHECKOUT (src/helpers/event.helper.js:8)
+
+```javascript
+const CHECKOUT = 'checkout-begin';
+```
+
+#### PURCHASE (src/helpers/event.helper.js:7)
+
+```javascript
+const PURCHASE = 'checkout';
+```
+
+#### CONVERSION_TYPES (src/models/heatmap/click.heatmap.js:5)
+
+```javascript
+const CONVERSION_TYPES = [
+    'add-to-cart',
+    'begin_checkout',
+    'abandoned_checkout',
+    'abandoned_cart',
+    'checkout',
+    'sign_up',
+    'sign_in',
+    'newsletter_subscribe',
+    'contact_form',
+    'custom_event',
+];
+```
+
+
+### ⚠️ Low-confidence match
+
+This query matched mostly on common words, so the entry points above may be off-target — treat them as a starting point, not a complete answer. For a reliable result:
+- `codegraph_explore` with the **exact symbol names** you are after (class / function / method names), or
+- `codegraph_search <name>` for one specific symbol
+- `codegraph_files` a likely area: `src/helpers`, `src/models/heatmap`
+
+Do not assume the list above is comprehensive.
+Relevant symbols:
+  constant Koa @ src/server.js:3
+  constant koaBody @ src/server.js:5
+  constant koaCompress @ src/server.js:6
+  constant app @ src/server.js:13
+  constant Router @ src/routes/area.route.js:1
+  constant Router @ src/routes/click.route.js:1
+  constant Router @ src/routes/metrics.route.js:1
+  constant Router @ src/routes/move.route.js:1
+  constant Router @ src/routes/page.route.js:1
+  constant Router @ src/routes/scroll.route.js:1
+
+--- Repo: sama-api (express) ---
+## Code Context
+
+**Query:** Khách báo ko có record trong ngày hôm nay. check xem nguyên nhân do đâu sao lại ko có traffic trong ngày hôm nay 
+
+### Entry Points
+
+- **checkShop** (function) - custom_script/subscription/check_differ_shop.js:14
+  `(shop)`
+- **checkDue** (function) - controllers/internal/config/review.controller.js:7
+  `(ctx)`
+- **RecordChannel** (constant) - queues/channel/internal/record.channel.js:5
+  `= (function () {
+    let channel;
+
+    const initialize = async (conn) => {
+        try {
+            ...`
+
+### Related Symbols
+
+- custom_script/subscription/check_differ_shop.js: processBatch:46
+
+### Code
+
+#### checkShop (custom_script/subscription/check_differ_shop.js:14)
+
+```javascript
+async function checkShop(shop) {
+    const { domain, access_token, charge_id, subscription_info } = shop;
+
+    if (!access_token || !charge_id || !subscription_info?.title) {
+        return null;
+    }
+
+    try {
+        const charge = await getActualPlanFromShopify(domain, access_token, charge_id);
+        const dbSubPlan = subscription_info.title.trim().toLowerCase();
+        const realSubPlan = charge.name.trim().toLowerCase();
+
+        const isSamePlan = dbSubPlan.includes(realSubPlan) || realSubPlan.includes(dbSubPlan);
+        const isCancelled = charge.status === 'cancelled';
+
+        if ((isCancelled && isSamePlan) || !isSamePlan) {
+            return {
+                domain,
+                charge_id,
+                chare_status: charge.status,
+                db_plan: subscription_info.title,
+                real_plan: charge.name,
+                cancelled_on: charge.cancelled_on,
+            };
+        }
+        return null;
+    } catch (err) {
+        console.log(`Error: checking ${domain}: ${err.message}`);
+        return null;
+    }
+}
+```
+
+#### checkDue (controllers/internal/config/review.controller.js:7)
+
+```javascript
+const checkDue = async (ctx) => {
+    const { _id: shopId, domain } = ctx.state.shopState;
+    try {
+        const review = await Revi
+Relevant symbols:
+  constant Koa @ server.js:5
+  constant koaBody @ server.js:6
+  constant koaCompress @ server.js:7
+  constant koaStatic @ server.js:8
+  constant app @ server.js:20
+  constant ratelimit @ middleware/rateLimit.middleware.js:1
+  constant Router @ routes/external/cms-plan.route.js:1
+  constant Router @ routes/external/cms-setting.route.js:1
+  constant Router @ routes/external/cms-shop-session.route.js:1
+  constant Router @ routes/external/crm.route.js:1
+
+--- Repo: sama-cms (react) ---
+## Code Context
+
+**Query:** Khách báo ko có record trong ngày hôm nay. check xem nguyên nhân do đâu sao lại ko có traffic trong ngày hôm nay 
+
+### Entry Points
+
+- **recorderSlice** (constant) - web/frontend/redux/reducers/recorder.reducer.js:34
+  `= createSlice({
+    name: 'recorder',
+    initialState,
+    reducers: {
+        setChangeIndexReplay: ...`
+- **CheckoutOverlay** (component) - packages/replayer/src/components/CheckoutOverlay.svelte:1
+- **recorderActions** (constant) - web/frontend/redux/reducers/recorder.reducer.js:122
+  `= recorderSlice.actions`
+
+### Related Symbols
+
+- packages/replayer/src/components/CheckoutOverlay.svelte: checkoutStyle:4, onUpgrade:5, onShopifyPlus:6, isUpgrade:7, isShopifyPlus:8
+- packages/replayer/src/components/Player.svelte: Player:1
+- web/frontend/components/HeatmapV2/FrameWorker/index.jsx: HeatMapFrameWorker:47
+
+### Code
+
+#### recorderSlice (web/frontend/redux/reducers/recorder.reducer.js:34)
+
+```javascript
+export const recorderSlice = createSlice({
+    name: 'recorder',
+    initialState,
+    reducers: {
+        setChangeIndexReplay: (state, action) => {
+            state.changeIndexReplay = action.payload;
+        },
+        setPagination: (state, action) => {
+            for (let [key, value] of Object.entries(action.payload)) {
+                state.pagination[key] = value;
+                if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+                    for (let [keyNested, valueNested] of Object.entries(value)) {
+                        state.pagination[key][keyNested] = valueNested;
+                    }
+                }
+            }
+        },
+        setSession: (state, action) => {
+            if (!action.payload?.cart_value) {
+                action.payload.cart_value = {
+                    items: [],
+                    original_total_price: 0,
+                    currency: '',
+                };
+            }
+            if (!action.payload?.ai_summary) {
+                action.payloa
+===
+
+
+Instructions:
+1. Classify the caseType (installation_oauth | embedded_admin_ui | storefront_extension | webhook_sync | api_permission | billing | data_integrity | performance | configuration | frontend_bug | unknown).
+2. Restate the issue clearly in technical terms.
+3. Generate 2-4 concrete, testable hypotheses ranked by likelihood.
+4. For each hypothesis: state what would CONFIRM it (observable signals) and what would REJECT it.
+5. Generate specific probes (investigation actions) targeting the most likely surfaces.
+   - surface options: code | database | logs | shopify | browser | config
+   - Only include probes for surfaces that are configured or have the storeDomain/URL available.
+   - Probe target should be specific (e.g., for code: glob="**/*.ts", regex="sessionToken|appBridge"; for database: collection="shops", query="shop_domain = ?").
+6. List any missing context that would improve the investigation (e.g., "need store URL to run browser probe").
+
+Prioritize: minimize LLM usage downstream — make probes as specific as possible so deterministic code can run them without needing further reasoning.
+
+GUARDRAIL — probe targets must reference REAL facts from the codebase context above:
+- For code probes: use symbol names, file paths, or regex that appear in the "CODEBASE CONTEXT" section. If no relevant symbol/file is listed, put the gap in missingContext instead of guessing.
+- For browser probes: use marker values from "Expected browser markers" listed above. If none are listed, put the gap in missingContext.
+- For database probes: use collection/table names from the app config. Do NOT invent table names.
+- If the codebase context is empty (no repos indexed), you may use informed guesses but must lower hypothesis confidence to 'low'.
+
+IMPORTANT: ALL text output fields must be in the same language as the Issue. Do not translate code symbols, file paths, or API names.

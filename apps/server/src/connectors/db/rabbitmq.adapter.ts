@@ -24,10 +24,13 @@ export class RabbitMQAdapter implements DbAdapter {
     }
 
     private inferMgmtUrl(amqpUrl: string): string {
-        return amqpUrl
-            .replace(/^amqps?:\/\//, 'http://')
-            .replace(/:5672/, ':15672')
-            .replace(/:5671/, ':15671');
+        const url = new URL(amqpUrl);
+
+        const protocol = url.protocol === 'amqps:' ? 'https:' : 'http:';
+
+        const amqpPort = Number(url.port || (url.protocol === 'amqps:' ? 5671 : 5672));
+
+        return `${protocol}//${url.username}:${url.password}@${url.hostname}:${amqpPort + 10000}`;
     }
 
     private parseCredentials(url: string): { username: string; password: string } {

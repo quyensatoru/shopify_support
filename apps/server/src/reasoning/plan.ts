@@ -147,7 +147,7 @@ GUARDRAIL — probe targets must reference REAL facts from the codebase context 
 - If the codebase context is empty (no repos indexed), you may use informed guesses but must lower hypothesis confidence to 'low'.
 
 IMPORTANT: ALL text output fields must be in the same language as the Issue. Do not translate code symbols, file paths, or API names.`;
-    fs.writeFileSync("prompt.txt", prompt, 'utf8')
+    fs.writeFileSync("plan.txt", prompt, 'utf8')
     const result = await structured.invoke(prompt);
     if (!result) throw new Error('plan_output: LLM returned null/undefined');
     logger.info(result);

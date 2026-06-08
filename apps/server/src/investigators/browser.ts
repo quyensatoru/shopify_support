@@ -43,7 +43,6 @@ export async function investigateBrowser(
     try {
         const page = await renderPage(url);
 
-        // ── Shared rich signals (collected for every action) ──────────
         const frameAncestors = extractCspFrameAncestors(page.responseHeaders);
         const appBridgePresent = detectAppBridge(page.scripts, page.html);
         const networkIssues = network4xxOr5xx(page.networkErrors);
@@ -56,9 +55,7 @@ export async function investigateBrowser(
             scriptCount: page.scripts.length,
         };
 
-        // ── action: check_markers ──────────────────────────────────────
         if (probe.action === 'check_markers') {
-            // Prefer explicit marker from probe; fallback to grounded markers from codeContext
             const explicitMarker = probe.target['marker'] as string | undefined;
             const groundedMarkers: string[] = explicitMarker
                 ? [explicitMarker]
@@ -98,7 +95,7 @@ export async function investigateBrowser(
             found: page.status > 0 && page.status < 500,
             data: {
                 title: page.title,
-                scripts: page.scripts.slice(0, 20),
+                scripts: page.scripts,
                 ...richSignals,
             },
             provenance: `browser:${url}`,

@@ -7,6 +7,7 @@ import type {
     FixPlan,
     CodeContext,
 } from '@shopify-support/shared';
+import * as fs from 'fs'
 
 const FixPlanOutputSchema = z.object({
     changes: z
@@ -83,7 +84,7 @@ Produce a concrete fix plan:
 - summary: one paragraph for the CSE to explain to the merchant.
 
 IMPORTANT: ALL text output fields (description, summary, rationale, verification steps) must be in the same language as the Issue. Do not translate code symbols, file paths, or API names.`;
-
+    fs.writeFileSync("fixplan.txt", prompt, 'utf8')
     const result = await structured.invoke(prompt);
     if (!result) throw new Error('fix_plan_output: LLM returned null/undefined');
     return result as FixPlan;

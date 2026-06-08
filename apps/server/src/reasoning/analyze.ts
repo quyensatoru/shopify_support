@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { getStructuredLlm } from '../llm/index.js';
 import type { Hypothesis, Evidence, Synthesis, CodeContext } from '@shopify-support/shared';
+import * as fs from 'fs'
 
 const AnalyzeOutputSchema = z.object({
     verdicts: z
@@ -87,7 +88,7 @@ Instructions:
 5. nextSteps: what the developer should investigate or verify manually.
 
 IMPORTANT: ALL text output fields must be in the same language as the Issue. Do not translate code symbols, file paths, or API names.`;
-
+    fs.writeFileSync("analyize.txt", prompt, 'utf8')
     const result = await structured.invoke(prompt);
     if (!result) throw new Error('analyze_output: LLM returned null/undefined');
     return result as Synthesis;

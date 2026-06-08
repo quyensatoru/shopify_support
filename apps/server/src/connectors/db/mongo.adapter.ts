@@ -16,6 +16,15 @@ export class MongoAdapter implements DbAdapter {
         return this.client.db(this.dbName);
     }
 
+    async healthCheck(): Promise<boolean> {
+        try {
+            await this.client.db('admin').command({ ping: 1 });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     async readSchema(collection: string): Promise<unknown> {
         await this.client.connect();
         const sample = await this.db().collection(collection).find({}).limit(1).toArray();

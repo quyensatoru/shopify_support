@@ -30,6 +30,7 @@ export async function renderPage(url: string): Promise<PageSignals> {
 
     const consoleErrors: string[] = [];
     const networkErrors: string[] = [];
+    let isShopify = null;
 
     page.on('console', (msg) => {
         if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -44,6 +45,9 @@ export async function renderPage(url: string): Promise<PageSignals> {
     let responseHeaders: Record<string, string> = {};
     try {
         const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 20_000 });
+        //simulator console tab
+        const shopify = await page.evaluate(() => window?.Shopify);
+
         status = response?.status() ?? 0;
         responseHeaders = (response?.headers() ?? {}) as Record<string, string>;
     } catch {
@@ -52,7 +56,6 @@ export async function renderPage(url: string): Promise<PageSignals> {
 
     const title = await page.title().catch(() => '');
     const html = await page.content().catch(() => '');
-    // String form avoids TS DOM-type errors (runs in browser context, not Node)
     const scripts = await page
         .evaluate<
             string[]
