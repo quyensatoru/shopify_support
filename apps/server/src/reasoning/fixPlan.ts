@@ -64,6 +64,7 @@ export async function runFixPlanReasoning(input: {
         .join('\n\n');
 
     const prompt = `You are a Shopify embedded app engineer creating a fix plan.
+LANGUAGE RULE: Detect the language of the Issue text and write ALL text output fields in that same language. Do not translate code identifiers, file paths, or technical names.
 
 App: ${input.app} | Repos: ${repos}
 Issue: ${input.issueText}
@@ -81,7 +82,7 @@ Produce a concrete fix plan:
 - risk: low (typo/config) | medium (logic change) | high (data migration/schema change).
 - summary: one paragraph for the CSE to explain to the merchant.
 
-IMPORTANT: The summary field must be written in the SAME language as the "Issue" text above.`;
+IMPORTANT: ALL text output fields (description, summary, rationale, verification steps) must be in the same language as the Issue. Do not translate code symbols, file paths, or API names.`;
 
     const result = await structured.invoke(prompt);
     if (!result) throw new Error('fix_plan_output: LLM returned null/undefined');

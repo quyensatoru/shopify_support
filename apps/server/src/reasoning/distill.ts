@@ -23,6 +23,7 @@ export async function runDistillReasoning(input: {
     const structured = getStructuredLlmFast(DistillOutputSchema, 'distill_output');
 
     const prompt = `Summarize this Shopify support case into a reusable memory entry.
+LANGUAGE RULE: Detect the language of the Issue text and write ALL text output fields in that same language. Do not translate code identifiers, file paths, or technical names.
 
 App: ${input.app} | caseType: ${input.caseType}
 Issue: ${input.issueText}
@@ -30,7 +31,8 @@ Root cause: ${input.synthesis.rootCause}
 Confidence: ${input.synthesis.confidence}
 Fix applied: ${input.artifacts?.mrUrl ? `MR ${input.artifacts.mrUrl}` : (input.synthesis.recommendedFix ?? 'diagnose only')}
 
-Create a concise, reusable memory entry. Focus on the INSIGHT that would help diagnose a similar issue faster next time.`;
+Create a concise, reusable memory entry. Focus on the INSIGHT that would help diagnose a similar issue faster next time.
+IMPORTANT: ALL text output fields must be in the same language as the Issue. Do not translate code symbols, file paths, or API names.`;
 
     const result = await structured.invoke(prompt);
     if (!result) throw new Error('distill_output: LLM returned null/undefined');

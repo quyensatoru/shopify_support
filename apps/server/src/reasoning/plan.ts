@@ -13,6 +13,7 @@ import type {
 } from '@shopify-support/shared';
 import { randomUUID } from 'node:crypto';
 import { logger } from '../observability/logger.js';
+import * as fs from 'fs'
 
 const PlanOutputSchema = z.object({
     caseType: z.enum([
@@ -114,6 +115,7 @@ export async function runPlanReasoning(input: PlanInput): Promise<{
         .join('\n');
 
     const prompt = `You are a Shopify embedded app support engineer. Analyze this issue and produce a structured investigation plan.
+LANGUAGE RULE: Detect the language of the Issue text and write ALL text output fields in that same language. Do not translate code identifiers, file paths, or technical names.
 
 App: ${input.app}
 Issue: ${input.issueText}
@@ -144,8 +146,8 @@ GUARDRAIL — probe targets must reference REAL facts from the codebase context 
 - For database probes: use collection/table names from the app config. Do NOT invent table names.
 - If the codebase context is empty (no repos indexed), you may use informed guesses but must lower hypothesis confidence to 'low'.
 
-IMPORTANT: All text fields (restatement, hypotheses, missingContext, rationale, hints) must be written in the SAME language as the "Issue" text above. If the issue is in Vietnamese, respond in Vietnamese. If English, respond in English.`;
-
+IMPORTANT: ALL text output fields must be in the same language as the Issue. Do not translate code symbols, file paths, or API names.`;
+    fs.writeFileSync("prompt.txt", prompt, 'utf8')
     const result = await structured.invoke(prompt);
     if (!result) throw new Error('plan_output: LLM returned null/undefined');
     logger.info(result);

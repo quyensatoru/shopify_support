@@ -61,6 +61,7 @@ export async function runAnalyzeReasoning(input: {
         .join('\n\n');
 
     const prompt = `You are a Shopify embedded app support engineer performing root cause analysis.
+LANGUAGE RULE: Detect the language of the Issue text and write ALL text output fields in that same language. Do not translate code identifiers, file paths, or technical names.
 
 App: ${input.app}
 Issue: ${input.issueText}
@@ -85,7 +86,7 @@ Instructions:
 4. recommendedFix: only if confidence ≥ medium and a clear fix exists.
 5. nextSteps: what the developer should investigate or verify manually.
 
-IMPORTANT: All text fields (rootCause, rationale, recommendedFix, nextSteps) must be written in the SAME language as the "Issue" text above.`;
+IMPORTANT: ALL text output fields must be in the same language as the Issue. Do not translate code symbols, file paths, or API names.`;
 
     const result = await structured.invoke(prompt);
     if (!result) throw new Error('analyze_output: LLM returned null/undefined');
