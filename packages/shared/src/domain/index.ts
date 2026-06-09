@@ -15,7 +15,7 @@ export const CaseTypeSchema = z.enum([
 ]);
 export type CaseType = z.infer<typeof CaseTypeSchema>;
 
-export const SurfaceSchema = z.enum(['code', 'database', 'logs', 'shopify', 'browser', 'config', 'rabbitmq']);
+export const SurfaceSchema = z.enum(['code', 'database', 'logs', 'shopify', 'browser', 'config', 'rabbitmq', 'snapshot']);
 export type Surface = z.infer<typeof SurfaceSchema>;
 
 export const SeveritySchema = z.enum(['low', 'normal', 'high', 'urgent']);
@@ -91,6 +91,11 @@ export const ProbeTargetSchema = z.object({
     // rabbitmq
     queue: z.string().optional(),
     n: z.string().optional(),
+    // snapshot (session-recording apps) — read the compressed recording from a DB
+    // source, decompress, then structurally analyze and/or replay it headless.
+    recordingId: z.string().optional(), // value identifying the recording/session
+    idField: z.string().optional(), // DB column/field that holds the recording id
+    snapshotField: z.string().optional(), // DB column/field that holds the compressed blob
 });
 export type ProbeTarget = z.infer<typeof ProbeTargetSchema>;
 
@@ -138,6 +143,10 @@ export const RepoConfigSchema = z.object({
     gitlabProjectId: z.string().optional(),
     url: z.string(),
     branch: z.string().default('main'),
+    // Short description of what this repo is responsible for (e.g. "frontend
+    // admin UI (React)", "heatmap data pipeline", "rrweb recorder"). Helps the
+    // planner target probes to the right repo instead of fanning out blindly.
+    role: z.string().optional(),
 });
 export type RepoConfig = z.infer<typeof RepoConfigSchema>;
 

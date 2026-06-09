@@ -81,18 +81,21 @@ export const AppConfigWriteSchema = z.object({
                 gitlabProjectId: z.string().optional(),
                 url: z.string(),
                 branch: z.string().optional(),
+                role: z.string().optional(),
             }),
         )
         .optional(),
     gitlab: z
-        .object({ baseUrl: z.string(), token: z.string(), groupId: z.string().optional() })
+        // token optional: the UI omits it when unchanged; server preserves the stored one.
+        .object({ baseUrl: z.string(), token: z.string().optional(), groupId: z.string().optional() })
         .optional(),
     dbSources: z
         .array(
             z.object({
                 key: z.string(),
                 type: z.enum(['sql', 'mongo', 'redis', 'rabbitmq']),
-                connectionString: z.string(),
+                // may be empty when unchanged in the UI; server preserves the stored one.
+                connectionString: z.string().optional().default(''),
                 mgmtUrl: z.string().optional(),
             }),
         )

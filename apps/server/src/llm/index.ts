@@ -11,8 +11,6 @@ import { getEnv } from '../env.js';
 import { logger } from '../observability/logger.js';
 import * as fs from 'fs'
 
-// ── Anthropic (via @langchain/anthropic — stays at core 0.3.x) ────────
-
 function buildAnthropic(fast: boolean): ChatAnthropic {
     const env = getEnv();
     return new ChatAnthropic({
@@ -32,12 +30,8 @@ function buildOpenRouter(fast: boolean): ChatOpenRouter {
     });
 }
 
-// ── OpenAI-compatible direct caller (used for both OpenAI & DeepSeek) ─
-// Uses openai SDK directly to avoid @langchain/openai version conflicts.
-
 type DirectChain<T> = Runnable<BaseLanguageModelInput, T>;
 
-// Sanitize LLM JSON output: strip markdown fences, escape literal control chars inside strings.
 function sanitizeLlmJson(text: string): string {
     // Strip markdown code fences
     let s = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
@@ -130,18 +124,32 @@ function buildDirectChain<T>(
                 max_tokens: cfg.maxTokens,
                 temperature: cfg.temperature,
             });
-            await fs.writeFileSync('response_output.txt', JSON.stringify(response.choices[0]?.message, null, 2) || '')
-            return JSON.parse(sanitizeLlmJson(response.choices[0]?.message?.content ?? '{}')) as unknown;
+            const choice = response.choices[0];
+            const finish = choice?.finish_reason;
+            const text = choice?.message?.content ?? '';
+            await fs.writeFileSync(
+                'response_output.json',
+                JSON.stringify({ finish_reason: finish, content: text }, null, 2),
+                'utf8',
+            );
+            // The completion was cut off (token cap / upstream limit) — the JSON is
+            // necessarily incomplete, so don't try to parse a half string. Throw a
+            // clear error that triggers the retry / provider fallback instead.
+            if (finish === 'length') {
+                throw new Error(
+                    `LLM output truncated (finish_reason=length, model=${cfg.model}). Completion cut off before valid JSON was produced.`,
+                );
+            }
+            return JSON.parse(sanitizeLlmJson(text || '{}')) as unknown;
         };
 
-        const raw = await call(content);
         try {
-            return tryParseSchema(schema, raw);
+            return tryParseSchema(schema, await call(content));
         } catch (firstErr) {
-            // Retry once, feeding the validation error back so the model can self-correct
+            // Retry once: covers both schema-mismatch and truncated/garbled JSON.
             const hint = firstErr instanceof Error ? firstErr.message : String(firstErr);
             const raw2 = await call(
-                `${content}\n\nIMPORTANT: Your previous response did not match the required schema.\nValidation error: ${hint.slice(0, 400)}\nPlease return corrected JSON.`,
+                `${content}\n\nIMPORTANT: Your previous response was invalid or truncated.\nError: ${hint}\nReturn the COMPLETE corrected JSON only, and keep it as compact as possible.`,
             );
             return tryParseSchema(schema, raw2);
         }
@@ -212,7 +220,7 @@ function buildProviders<T>(schema: z.ZodType<T>, name: string, fast: boolean) {
             chain: buildDirectChain(schema, {
                 apiKey: env.OPENROUTER_API_KEY,
                 baseURL: 'https://openrouter.ai/api/v1',
-                model: 'openai/gpt-oss-120b:free',
+                model: 'nvidia/nemotron-3-super-120b-a12b:free',
                 maxTokens: fast ? 4096 : 8192,
                 temperature: 0,
             }),

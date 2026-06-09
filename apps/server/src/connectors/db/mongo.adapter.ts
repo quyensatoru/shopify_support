@@ -1,5 +1,6 @@
 import { MongoClient } from 'mongodb';
-import type { DbAdapter } from './base.adapter.js';
+import type { DbAdapter, DbEntity } from './base.adapter.js';
+import { parseReadOnlyMongoFilter } from './readonly.guard.js';
 
 export class MongoAdapter implements DbAdapter {
     private client: MongoClient;
@@ -25,6 +26,29 @@ export class MongoAdapter implements DbAdapter {
         }
     }
 
+    async listEntities(): Promise<DbEntity[]> {
+        await this.client.connect();
+        const collections = await this.db().listCollections({}, { nameOnly: true }).toArray();
+        const names = collections
+            .map((c) => c.name)
+            .filter((n) => !n.startsWith('system.'))
+            .slice(0, 40);
+
+        const entities: DbEntity[] = [];
+        for (const name of names) {
+            // Infer a field-level schema from one sample document.
+            const sample = await this.db().collection(name).find({}).limit(1).toArray();
+            const columns = sample.length
+                ? Object.entries(sample[0]!).map(([k, v]) => ({
+                      name: k,
+                      type: Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v,
+                  }))
+                : [];
+            entities.push({ name, kind: 'collection', columns });
+        }
+        return entities;
+    }
+
     async readSchema(collection: string): Promise<unknown> {
         await this.client.connect();
         const sample = await this.db().collection(collection).find({}).limit(1).toArray();
@@ -38,15 +62,16 @@ export class MongoAdapter implements DbAdapter {
         query: string,
     ): Promise<{ exists: boolean; sample?: unknown }> {
         await this.client.connect();
-        // query is a JSON string like '{"shop_domain":"x.myshopify.com"}'
-        const filter = JSON.parse(query) as Record<string, unknown>;
+        // query is a JSON string like '{"shop_domain":"x.myshopify.com"}'.
+        // Guard strips server-side-JS operators ($where, $function, ...).
+        const filter = parseReadOnlyMongoFilter(query);
         const docs = await this.db().collection(collection).find(filter).limit(3).toArray();
         return { exists: docs.length > 0, sample: docs };
     }
 
     async count(collection: string, query: string): Promise<number> {
         await this.client.connect();
-        const filter = JSON.parse(query) as Record<string, unknown>;
+        const filter = parseReadOnlyMongoFilter(query);
         return this.db().collection(collection).countDocuments(filter);
     }
 

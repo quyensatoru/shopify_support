@@ -5,6 +5,8 @@ import { intakeNode } from './nodes/intake.js';
 import { gatherContextNode } from './nodes/gatherContext.js';
 import { planNode } from './nodes/plan.js';
 import { diagnoseNode } from './nodes/diagnose.js';
+import { refineProbesNode } from './nodes/probeRefine.js';
+import { investigateLoopNode } from './nodes/investigateLoop.js';
 import { analyzeNode } from './nodes/analyze.js';
 import { replanNode } from './nodes/replan.js';
 import { fixPlanNode } from './nodes/fixPlan.js';
@@ -19,22 +21,26 @@ import {
     decideAfterDiagnose,
     decideAfterAnalyze,
     decideAfterApprove,
+    decideAfterInvestigate,
 } from './nodes/decide.js';
 import type { RunRequest, SupportRunOutput, StreamEvent } from '@shopify-support/shared';
 import { logger } from '../observability/logger.js';
+import { getEnv } from '../env.js';
 import { updateRunStatus } from '../db/repo/index.js';
 
 // Build & compile the graph (lazy singleton)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _compiled: CompiledStateGraph<any, any, any> | undefined;
 
-function buildGraph() {
-    const wf = new StateGraph(SupportState)
+// Structured (default): deterministic plan → diagnose → refine → analyze → replan core.
+function buildStructuredGraph() {
+    return new StateGraph(SupportState)
         .addNode('intake', intakeNode)
         .addNode('gather_context', gatherContextNode)
         .addNode('planner', planNode)
         .addNode('ask_context', askContextNode)
         .addNode('diagnose', diagnoseNode)
+        .addNode('refine_probes', refineProbesNode)
         .addNode('analyze', analyzeNode)
         .addNode('replan', replanNode)
         .addNode('fix_planner', fixPlanNode)
@@ -55,8 +61,10 @@ function buildGraph() {
         .addEdge('ask_context', 'diagnose')
         .addConditionalEdges('diagnose', decideAfterDiagnose, {
             diagnose: 'diagnose',
+            refine_probes: 'refine_probes',
             analyze: 'analyze',
         })
+        .addEdge('refine_probes', 'diagnose')
         .addConditionalEdges('analyze', decideAfterAnalyze, {
             replan: 'replan',
             fix_planner: 'fix_planner',
@@ -72,8 +80,41 @@ function buildGraph() {
         .addEdge('verify', 'memorize')
         .addEdge('memorize', 'finalize')
         .addEdge('finalize', END);
+}
 
-    return wf; // compile happens after checkpointer is ready
+// Agentic (opt-in via INVESTIGATION_MODE=agentic): bounded tool-calling investigation loop.
+function buildAgenticGraph() {
+    return new StateGraph(SupportState)
+        .addNode('intake', intakeNode)
+        .addNode('gather_context', gatherContextNode)
+        .addNode('investigate_loop', investigateLoopNode)
+        .addNode('fix_planner', fixPlanNode)
+        .addNode('approve', approveNode)
+        .addNode('fixApply', fixApplyNode)
+        .addNode('verify', verifyNode)
+        .addNode('memorize', memorizeNode)
+        .addNode('finalize', finalizeNode)
+
+        .addEdge(START, 'intake')
+        .addEdge('intake', 'gather_context')
+        .addEdge('gather_context', 'investigate_loop')
+        .addConditionalEdges('investigate_loop', decideAfterInvestigate, {
+            fix_planner: 'fix_planner',
+            memorize: 'memorize',
+        })
+        .addEdge('fix_planner', 'approve')
+        .addConditionalEdges('approve', decideAfterApprove, {
+            fixApply: 'fixApply',
+            memorize: 'memorize',
+        })
+        .addEdge('fixApply', 'verify')
+        .addEdge('verify', 'memorize')
+        .addEdge('memorize', 'finalize')
+        .addEdge('finalize', END);
+}
+
+function buildGraph() {
+    return getEnv().INVESTIGATION_MODE === 'agentic' ? buildAgenticGraph() : buildStructuredGraph();
 }
 
 async function getCompiledGraph() {

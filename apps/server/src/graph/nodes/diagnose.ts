@@ -12,14 +12,22 @@ function pendingProbes(state: SupportStateType): Probe[] {
 }
 
 function evidenceFromResult(result: ProbeResult): Evidence | null {
-    if (!result.found || result.status !== 'done') return null;
+    // Keep BOTH positive and negative results. A successful probe that found
+    // nothing (shop missing, queue empty, no recent data) is often the strongest
+    // diagnostic signal — dropping it blinds the analysis.
+    if (result.status !== 'done') return null;
+    const polarity = result.found ? 'positive' : 'negative';
+    const claim = result.found
+        ? `[${result.surface}] ${result.action}: found`
+        : `[${result.surface}] ${result.action}: NOT found / empty`;
     return {
         id: randomUUID(),
         surface: result.surface,
-        claim: `[${result.surface}] ${result.action}: found`,
+        claim,
         value: result.data,
         refs: [result.probeId],
         source: result.provenance,
+        polarity,
     };
 }
 

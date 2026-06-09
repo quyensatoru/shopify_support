@@ -32,7 +32,7 @@ type TestResult = { surface: string; key: string; ok: boolean; message: string }
 
 // ── Config form state ────────────────────────────────────────────────
 
-type RepoEntry = { name: string; url: string; gitlabProjectId: string; branch: string };
+type RepoEntry = { name: string; url: string; gitlabProjectId: string; branch: string; role: string };
 type DbEntry = { key: string; type: string; connectionString: string; mgmtUrl: string };
 type GitLabRepoItem = {
     id: number;
@@ -90,6 +90,25 @@ const STATUS_COLOR: Record<string, string> = {
     awaiting_input: '#6d28d9',
     awaiting_approval: '#b45309',
     partial: '#065f46',
+};
+
+// Friendly labels for graph nodes (incl. new nodes from the big update).
+const NODE_LABEL: Record<string, string> = {
+    intake: 'Intake',
+    gather_context: 'Gather context',
+    planner: 'Plan',
+    ask_context: 'Ask context',
+    diagnose: 'Diagnose',
+    refine_probes: 'Refine probes',
+    analyze: 'Analyze',
+    replan: 'Replan',
+    investigate_loop: 'Investigate (agentic)',
+    fix_planner: 'Fix plan',
+    approve: 'Approve',
+    fixApply: 'Apply fix',
+    verify: 'Verify',
+    memorize: 'Memorize',
+    finalize: 'Finalize',
 };
 
 const STATUS_BG: Record<string, string> = {
@@ -532,7 +551,7 @@ function RunTab() {
                                                 fontWeight: 600,
                                             }}
                                         >
-                                            [{ev.node}]
+                                            [{NODE_LABEL[ev.node] ?? ev.node}]
                                         </span>{' '}
                                         <span
                                             style={{ color: STATUS_COLOR[ev.status] ?? '#374151' }}
@@ -670,6 +689,7 @@ function AppConfigTab() {
                             url: r['url'] ?? '',
                             gitlabProjectId: r['gitlabProjectId'] ?? '',
                             branch: r['branch'] ?? 'main',
+                            role: r['role'] ?? '',
                         }),
                     ),
                     gitlabBaseUrl: gl['baseUrl'] ?? '',
@@ -710,6 +730,7 @@ function AppConfigTab() {
                           url: r.url,
                           ...(r.gitlabProjectId ? { gitlabProjectId: r.gitlabProjectId } : {}),
                           branch: r.branch || 'main',
+                          ...(r.role?.trim() ? { role: r.role.trim() } : {}),
                       })),
                   }
                 : {}),
@@ -835,6 +856,7 @@ function AppConfigTab() {
                     url: item.http_url_to_repo,
                     gitlabProjectId: id,
                     branch: item.default_branch || 'main',
+                    role: '',
                 },
             ]);
         }
@@ -1160,10 +1182,58 @@ function AppConfigTab() {
                                 </div>
                             </div>
                         )}
-                        {form.selectedRepos.length > 0 && fetchedRepos.length === 0 && (
-                            <div style={{ fontSize: 11, color: '#6b7280' }}>
-                                {form.selectedRepos.length} repo(s) configured. Fetch repos above to
-                                modify selection.
+                        {form.selectedRepos.length > 0 && (
+                            <div style={{ marginTop: 10 }}>
+                                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 6 }}>
+                                    Selected repos — set a role so the agent targets probes to the
+                                    right repo (e.g. "frontend admin UI (React)", "heatmap data
+                                    pipeline", "rrweb recorder"):
+                                </div>
+                                {form.selectedRepos.map((r, i) => (
+                                    <div
+                                        key={r.gitlabProjectId || r.name || i}
+                                        style={{
+                                            display: 'flex',
+                                            gap: 6,
+                                            alignItems: 'center',
+                                            marginBottom: 6,
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                width: 160,
+                                                fontWeight: 600,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                            title={r.name}
+                                        >
+                                            {r.name}
+                                        </span>
+                                        <input
+                                            value={r.role}
+                                            onChange={(e) =>
+                                                updateArr<RepoEntry>('selectedRepos', i, {
+                                                    role: e.target.value,
+                                                })
+                                            }
+                                            placeholder="role / responsibility (optional)"
+                                            style={{ ...inp, flex: 1 }}
+                                        />
+                                        <button
+                                            onClick={() =>
+                                                setFormField(
+                                                    'selectedRepos',
+                                                    form.selectedRepos.filter((_, j) => j !== i),
+                                                )
+                                            }
+                                            style={{ ...btn('#dc2626'), padding: '3px 8px', fontSize: 11 }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -1717,15 +1787,19 @@ function MemoryTab() {
         setMemories((prev) => prev.filter((m) => m.id !== id));
     };
 
+    // Mirrors CaseTypeSchema in @shopify-support/shared (domain/index.ts).
     const CASE_TYPES = [
-        'config_drift',
-        'auth_scope_missing',
-        'webhook_missing',
-        'theme_extension_missing',
-        'embedded_ui_broken',
-        'api_error',
-        'billing_issue',
-        'other',
+        'installation_oauth',
+        'embedded_admin_ui',
+        'storefront_extension',
+        'webhook_sync',
+        'api_permission',
+        'billing',
+        'data_integrity',
+        'performance',
+        'configuration',
+        'frontend_bug',
+        'unknown',
     ];
 
     return (

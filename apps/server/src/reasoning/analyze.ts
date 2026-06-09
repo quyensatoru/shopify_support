@@ -34,7 +34,7 @@ export async function runAnalyzeReasoning(input: {
     const evidenceSummary = input.evidence
         .map(
             (e) =>
-                `[${e.id}] surface=${e.surface}: ${e.claim} | value=${JSON.stringify(e.value).slice(0, 200)}`,
+                `[${e.id}] (${e.polarity ?? 'positive'}) surface=${e.surface}: ${e.claim} | value=${JSON.stringify(e.value).slice(0, 200)}`,
         )
         .join('\n');
 
@@ -81,8 +81,10 @@ Instructions:
 1. For EACH hypothesis, produce a verdict (confirmed | rejected | inconclusive).
    - You MUST cite specific evidenceRefs (evidence IDs from above). Do NOT invent evidence.
    - If no evidence supports or refutes a hypothesis → inconclusive.
+   - NEGATIVE evidence (marked "(negative)" — e.g. record not found, queue empty, no recent data) is real, often decisive evidence. Use it to CONFIRM or REJECT hypotheses (e.g. "no heatmap rows for this shop" confirms a data-pipeline gap). Do not treat negative results as "no evidence".
 2. State the root cause: be specific, grounded in confirmed evidence only.
    - If confidence must be low (no confirmed hypothesis), say so explicitly.
+   - ENV/CONFIG vars are NOT a terminal root cause. If an env var is implicated, the evidence includes "search_code" results showing where it is READ. Trace that read site to the concrete downstream failure (what code path breaks, what throws, what silently misbehaves when the var is absent/wrong) and state THAT as the root cause, citing the code evidence. Do not stop at "env X is missing".
 3. Confidence: high = 1+ confirmed hypothesis with strong evidence; medium = partial evidence; low = mostly inconclusive.
 4. recommendedFix: only if confidence ≥ medium and a clear fix exists.
 5. nextSteps: what the developer should investigate or verify manually.

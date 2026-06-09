@@ -53,7 +53,10 @@ router.put('/apps/:appKey/config', async (req, res) => {
     try {
         const body = AppConfigWriteSchema.parse(req.body);
         const appKey = req.params['appKey']!;
-        await upsertAppConfig(appKey, body.name, encryptConfigSecrets(body));
+        const existing = await getAppConfig(appKey).catch(() => null);
+        const enc = encryptConfigSecrets(body);
+        if (existing) preserveSecrets(enc, body, existing.config as Record<string, unknown>);
+        await upsertAppConfig(appKey, body.name, enc);
         res.json({ ok: true });
     } catch (err) {
         res.status(400).json({ error: String(err) });
@@ -292,6 +295,58 @@ function encryptConfigSecrets(body: Record<string, unknown>): Record<string, unk
         }));
     }
     return cfg;
+}
+
+/**
+ * The UI loads secrets masked (empty), so a save that doesn't re-enter them would
+ * otherwise wipe them. Backfill any secret that was empty in the incoming body
+ * with the already-encrypted value from the existing stored config.
+ */
+function preserveSecrets(
+    enc: Record<string, unknown>,
+    body: Record<string, unknown>,
+    existing: Record<string, unknown>,
+): void {
+    const arr = (v: unknown) => (Array.isArray(v) ? (v as Array<Record<string, string>>) : []);
+    const byKey = (list: Array<Record<string, string>>, key: string) =>
+        list.find((x) => x['key'] === key);
+
+    // gitlab.token
+    const encGl = enc['gitlab'] as Record<string, string> | undefined;
+    const bodyGl = body['gitlab'] as Record<string, string> | undefined;
+    const exGl = existing['gitlab'] as Record<string, string> | undefined;
+    if (encGl && !bodyGl?.['token'] && exGl?.['token']) encGl['token'] = exGl['token'];
+
+    // dbSources.connectionString / mgmtUrl (matched by key)
+    for (const s of arr(enc['dbSources'])) {
+        const b = byKey(arr(body['dbSources']), s['key']!);
+        const e = byKey(arr(existing['dbSources']), s['key']!);
+        if (!b?.['connectionString'] && e?.['connectionString'])
+            s['connectionString'] = e['connectionString'];
+        if (!b?.['mgmtUrl'] && e?.['mgmtUrl']) s['mgmtUrl'] = e['mgmtUrl'];
+    }
+
+    // logSources.endpoint / token
+    for (const s of arr(enc['logSources'])) {
+        const b = byKey(arr(body['logSources']), s['key']!);
+        const e = byKey(arr(existing['logSources']), s['key']!);
+        if (!b?.['endpoint'] && e?.['endpoint']) s['endpoint'] = e['endpoint'];
+        if (!b?.['token'] && e?.['token']) s['token'] = e['token'];
+    }
+
+    // shopify.adminToken
+    const encSh = enc['shopify'] as Record<string, string> | undefined;
+    const bodySh = body['shopify'] as Record<string, string> | undefined;
+    const exSh = existing['shopify'] as Record<string, string> | undefined;
+    if (encSh && !bodySh?.['adminToken'] && exSh?.['adminToken'])
+        encSh['adminToken'] = exSh['adminToken'];
+
+    // services.token
+    for (const s of arr(enc['services'])) {
+        const b = byKey(arr(body['services']), s['key']!);
+        const e = byKey(arr(existing['services']), s['key']!);
+        if (!b?.['token'] && e?.['token']) s['token'] = e['token'];
+    }
 }
 
 function maskSecrets(cfg: Record<string, unknown>): Record<string, unknown> {

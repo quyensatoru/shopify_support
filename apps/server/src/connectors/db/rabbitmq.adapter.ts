@@ -1,4 +1,4 @@
-import type { DbAdapter } from './base.adapter.js';
+import type { DbAdapter, DbEntity } from './base.adapter.js';
 
 type RabbitMQQueueInfo = {
     name: string;
@@ -49,6 +49,16 @@ export class RabbitMQAdapter implements DbAdapter {
         } catch {
             return url;
         }
+    }
+
+    async listEntities(): Promise<DbEntity[]> {
+        const base = this.mgmtApiUrl(this.mgmtUrl);
+        const res = await fetch(`${base}/api/queues`, { headers: this.headers });
+        if (!res.ok) return [];
+        const queues = (await res.json()) as Array<{ name: string; messages?: number }>;
+        return queues
+            .slice(0, 60)
+            .map((q) => ({ name: q.name, kind: 'queue' as const, approxCount: q.messages ?? 0 }));
     }
 
     async readSchema(queue: string): Promise<unknown> {

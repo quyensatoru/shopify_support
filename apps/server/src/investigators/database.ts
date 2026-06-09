@@ -39,6 +39,18 @@ export async function investigateDatabase(
 
     try {
         switch (probe.action) {
+            case 'discover': {
+                // Introspection: list tables/collections/keyspaces/queues (with
+                // cheap schema) so reasoning can synthesize a grounded read-only query.
+                const entities = await adapter.listEntities();
+                return {
+                    ...base,
+                    status: 'done',
+                    found: entities.length > 0,
+                    data: { sourceKey: source.key, sourceType: source.type, entities },
+                    provenance: `${provenance}:discover`,
+                };
+            }
             case 'read_schema': {
                 const schema = await adapter.readSchema(
                     probe.target['collection'] ?? probe.target['table'] ?? '',

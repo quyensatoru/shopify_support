@@ -122,6 +122,79 @@ export function searchSymbols(cg: CgInstance, query: string, limit = 10): Search
     }
 }
 
+// Framework/boilerplate symbol names that pollute relevance — almost never the
+// answer to a diagnosis query.
+const BOILERPLATE_NAMES = new Set([
+    'app',
+    'koa',
+    'Koa',
+    'koaBody',
+    'koaStatic',
+    'koaCompress',
+    'cors',
+    'Router',
+    'router',
+    'express',
+    'server',
+    'index',
+    'config',
+    'logger',
+    'ratelimit',
+]);
+const BOILERPLATE_KINDS = new Set(['import', 'module']);
+
+/**
+ * Search symbols across a set of English technical keywords, drop framework
+ * boilerplate, and rank by (a) how many keywords match name/path and (b) whether
+ * the file path contains a keyword. Returns the top `limit` distinct symbols.
+ *
+ * This replaces feeding the raw (often non-English) issue text to searchNodes,
+ * which matched common words and surfaced `import koa` / `Router` noise.
+ */
+export function searchRelevantSymbols(
+    cg: CgInstance,
+    keywords: string[],
+    limit = 8,
+): SearchResult[] {
+    const keys = keywords.filter((k) => k && k.length >= 2).slice(0, 10);
+    if (!keys.length) return [];
+
+    const seen = new Map<string, { result: SearchResult; score: number }>();
+    for (const kw of keys) {
+        let hits: SearchResult[] = [];
+        try {
+            hits = cg.searchNodes(kw, { limit: 15 });
+        } catch {
+            continue;
+        }
+        for (const r of hits) {
+            const n = r.node;
+            const name = n.name ?? '';
+            if (!name) continue;
+            if (BOILERPLATE_KINDS.has(n.kind)) continue;
+            if (BOILERPLATE_NAMES.has(name)) continue;
+
+            const id = n.id ?? `${n.filePath}:${name}`;
+            const lname = name.toLowerCase();
+            const lpath = (n.filePath ?? '').toLowerCase();
+            // Score: keyword in name (2) + keyword in path (1), summed across all keys.
+            let score = 0;
+            for (const k of keys) {
+                const lk = k.toLowerCase();
+                if (lname.includes(lk)) score += 2;
+                if (lpath.includes(lk)) score += 1;
+            }
+            const prev = seen.get(id);
+            if (!prev || score > prev.score) seen.set(id, { result: r, score });
+        }
+    }
+
+    return [...seen.values()]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map((s) => s.result);
+}
+
 /**
  * Get callers of a node (by node ID). Returns simplified shape.
  */
@@ -186,26 +259,50 @@ export function getImpact(
 }
 
 /**
- * Detect framework-specific markers that should appear in the rendered storefront/admin.
+ * Detect markers that should appear in the rendered page — usable to ground a
+ * browser probe ("is the heatmap canvas / mount point actually present?").
+ *
+ * Works for BOTH Shopify themes (handle fields, custom elements) and SPA/React
+ * apps (canvas/container ids, render constants, mount selectors). Seeded by the
+ * issue's technical keywords so it surfaces markers relevant to THIS issue.
  */
-export function detectExpectedMarkers(cg: CgInstance): string[] {
+export function detectExpectedMarkers(cg: CgInstance, keywords: string[] = []): string[] {
     try {
         const markers: string[] = [];
+        const push = (v?: string | null) => {
+            if (v && /^[\w$-]{2,}$/.test(v)) markers.push(v);
+        };
 
-        const handleNodes = cg.searchNodes('handle', { limit: 20 });
-        for (const r of handleNodes) {
-            const n = r.node;
-            if (n.name && /^[\w-]+$/.test(n.name) && n.kind === 'field') {
-                markers.push(n.name);
+        // 1. Shopify theme style: handle fields + custom elements.
+        for (const r of cg.searchNodes('handle', { limit: 20 })) {
+            if (r.node.kind === 'field') push(r.node.name);
+        }
+        for (const r of cg.searchNodes('customElements', { limit: 10 })) {
+            if (r.node.name?.includes('-')) push(r.node.name);
+        }
+
+        // 2. SPA/React: render/mount/canvas/container symbols + issue keywords.
+        const seeds = [
+            'canvas',
+            'render',
+            'mount',
+            'container',
+            'rootId',
+            'elementId',
+            ...keywords,
+        ];
+        for (const seed of seeds.slice(0, 12)) {
+            for (const r of cg.searchNodes(seed, { limit: 6 })) {
+                const n = r.node;
+                // Constants / variables / fields whose value or name is a likely
+                // DOM marker (id, class, custom element, render container).
+                if (['constant', 'variable', 'field', 'component', 'class'].includes(n.kind)) {
+                    push(n.name);
+                }
             }
         }
 
-        const elementNodes = cg.searchNodes('customElements', { limit: 10 });
-        for (const r of elementNodes) {
-            if (r.node.name?.includes('-')) markers.push(r.node.name);
-        }
-
-        return [...new Set(markers)].slice(0, 10);
+        return [...new Set(markers)].slice(0, 12);
     } catch {
         return [];
     }

@@ -81,6 +81,10 @@ export const EvidenceSchema = z.object({
     value: z.unknown(),
     refs: z.array(z.string()), // probeIds
     source: z.string(),
+    // 'negative' = the probe ran successfully but the thing was absent/empty
+    // (e.g. shop record not found, queue empty). Negative evidence is often the
+    // most diagnostic signal, so it is kept rather than dropped.
+    polarity: z.enum(['positive', 'negative']).default('positive'),
 });
 export type Evidence = z.infer<typeof EvidenceSchema>;
 

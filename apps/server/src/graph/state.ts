@@ -30,6 +30,13 @@ export const SupportState = Annotation.Root({
         default: () => [],
     }),
 
+    // 1a. Search keys (English technical terms for code retrieval)
+    searchQuery: Annotation<string | undefined>(),
+    searchKeywords: Annotation<string[]>({
+        reducer: (_a, b) => b,
+        default: () => [],
+    }),
+
     // 1b. Gathered context
     codeContexts: Annotation<CodeContext[]>({
         reducer: (_a, b) => b,
@@ -50,6 +57,24 @@ export const SupportState = Annotation.Root({
     iteration: Annotation<number>({
         reducer: (a, b) => a + b,
         default: () => 0,
+    }),
+    // Number of probe-refinement passes (DB query synthesis / env trace) — bounded loop guard.
+    refineCount: Annotation<number>({
+        reducer: (a, b) => a + b,
+        default: () => 0,
+    }),
+    // Ids resolved from earlier DB probes (e.g. shop_id from a domain lookup) for dependent queries.
+    resolvedIds: Annotation<Array<{ field: string; value: string; source?: string }>>({
+        reducer: (a, b) => {
+            const seen = new Set(a.map((r) => `${r.field}=${r.value}`));
+            return [...a, ...b.filter((r) => !seen.has(`${r.field}=${r.value}`))];
+        },
+        default: () => [],
+    }),
+    // Set when a refine pass produced no new probes → stop refining.
+    refineStalled: Annotation<boolean>({
+        reducer: (_a, b) => b,
+        default: () => false,
     }),
 
     // 3. Diagnosis

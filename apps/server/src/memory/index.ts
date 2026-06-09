@@ -46,6 +46,6 @@ export async function retrieveMemories(
         reusableInsight: r.reusableInsight,
         confidence: r.confidence as CaseMemory['confidence'],
         sourceRunId: r.sourceRunId,
-        createdAt: r.createdAt.toISOString(),
+        createdAt: new Date(r.createdAt).toISOString(),
     }));
 }

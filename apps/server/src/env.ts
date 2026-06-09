@@ -26,6 +26,10 @@ const schema = z
             .transform((v) => v !== 'false')
             .default('true'),
         WORKSPACE_DIR: z.string().default('./workspace'),
+        // Investigation core: 'structured' = deterministic graph (default, free model);
+        // 'agentic' = bounded tool-calling loop (needs ANTHROPIC_API_KEY, costs $).
+        INVESTIGATION_MODE: z.enum(['structured', 'agentic']).default('structured'),
+        INVESTIGATION_MAX_STEPS: z.coerce.number().int().positive().max(40).default(12),
         TAVILY_API_KEY: z.string().min(1).optional(),
         FIRECRAWL_API_KEY: z.string().min(1).optional(),
         EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),

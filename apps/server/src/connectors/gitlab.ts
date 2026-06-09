@@ -25,7 +25,11 @@ export async function cloneOrPull(
 
     if (existsSync(path.join(repoPath, '.git'))) {
         const git: SimpleGit = simpleGit(repoPath);
-        await git.pull('origin', repo.branch ?? 'main');
+        // Pull from the freshly-built authenticated URL, NOT the stored 'origin'
+        // remote — origin may carry a stale or missing token from the initial
+        // clone (e.g. cloned before a token was set, or after the token rotated),
+        // which causes "Authentication failed" on pull.
+        await git.pull(repoUrl, repo.branch ?? 'main');
     } else {
         mkdirSync(repoPath, { recursive: true });
         const git: SimpleGit = simpleGit();

@@ -1,6 +1,7 @@
 import { interrupt } from '@langchain/langgraph';
 import type { SupportStateType } from '../state.js';
 import type { Probe } from '@shopify-support/shared';
+import { needsRefine } from './probeRefine.js';
 
 // ── After plan ───────────────────────────────────────────────────────
 
@@ -42,9 +43,13 @@ function hasPendingProbes(state: SupportStateType): boolean {
     return state.plan.probes.some((p: Probe) => p.status === 'pending' && !doneIds.has(p.id));
 }
 
-export function decideAfterDiagnose(state: SupportStateType): 'diagnose' | 'analyze' {
-    if (state.strongSignal) return 'analyze';
+export function decideAfterDiagnose(
+    state: SupportStateType,
+): 'diagnose' | 'refine_probes' | 'analyze' {
+    // Run any probes still pending in the current batch first.
     if (hasPendingProbes(state)) return 'diagnose';
+    // Deepen with DB query synthesis / env-trace before committing to analysis.
+    if (needsRefine(state)) return 'refine_probes';
     return 'analyze';
 }
 
@@ -61,6 +66,13 @@ export function decideAfterAnalyze(state: SupportStateType): 'replan' | 'fix_pla
     if (request.mode === 'fix' && synthesis?.recommendedFix) return 'fix_planner';
 
     // Otherwise: diagnose-only or not actionable
+    return 'memorize';
+}
+
+// ── After agentic investigate_loop ────────────────────────────────────
+
+export function decideAfterInvestigate(state: SupportStateType): 'fix_planner' | 'memorize' {
+    if (state.request.mode === 'fix' && state.synthesis?.recommendedFix) return 'fix_planner';
     return 'memorize';
 }
 

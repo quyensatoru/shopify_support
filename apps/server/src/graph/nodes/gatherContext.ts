@@ -3,7 +3,7 @@ import {
     ensureIndex,
     buildRepoContext,
     detectExpectedMarkers,
-    searchSymbols,
+    searchRelevantSymbols,
 } from '../../connectors/codegraph.js';
 import { retrieveAppKnowledge, learnApp, hasAppKnowledge } from '../../knowledge/index.js';
 import { stepLog } from '../utils.js';
@@ -38,16 +38,16 @@ export async function gatherContextNode(state: SupportStateType) {
                       const repoPath = path.join(workspaceDir, repo.name);
                       try {
                           const cg = await ensureIndex(repo, repoPath, appConfig!.gitlab!);
+                          // Use the English technical search query/keywords (from intake),
+                          // NOT the raw (often non-English) issue text.
+                          const codeQuery = state.searchQuery || request.issueText;
+                          const keywords = state.searchKeywords?.length
+                              ? state.searchKeywords
+                              : codeQuery.split(/\s+/);
                           const [contextMarkdown, markers, topSymbols] = await Promise.all([
-                              buildRepoContext(cg, request.issueText),
-                              Promise.resolve(detectExpectedMarkers(cg)),
-                              Promise.resolve(
-                                  searchSymbols(
-                                      cg,
-                                      request.issueText.split(' ').slice(0, 3).join(' '),
-                                      10,
-                                  ),
-                              ),
+                              buildRepoContext(cg, codeQuery),
+                              Promise.resolve(detectExpectedMarkers(cg, keywords)),
+                              Promise.resolve(searchRelevantSymbols(cg, keywords, 8)),
                           ]);
                           const frameworks = cg.getDetectedFrameworks();
                           return {

@@ -11,6 +11,7 @@ import { investigateLogs } from './logs.js';
 import { investigateShopify } from './shopify.js';
 import { investigateBrowser } from './browser.js';
 import { investigateConfig } from './config.js';
+import { investigateSnapshot } from './snapshot.js';
 
 export async function dispatchInvestigator(
     probe: Probe,
@@ -47,6 +48,9 @@ export async function dispatchInvestigator(
             break;
         case 'config':
             result = await investigateConfig(probe, appConfig);
+            break;
+        case 'snapshot':
+            result = await investigateSnapshot(probe, appConfig);
             break;
         default:
             result = {

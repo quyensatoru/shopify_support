@@ -30,10 +30,15 @@ import type { AppKnowledgeChunk } from '@shopify-support/shared';
 import { logger } from '../observability/logger.js';
 import { getEnv } from '../env.js';
 
-const CHUNK_SIZE = 800;
+const CHUNK_SIZE = 1000;
+const CHUNK_OVERLAP = 120;
+const MIN_CHUNK = 80;
 const MAX_CHUNKS_PER_SOURCE = 10;
 // How many pages to crawl per docUrl when using Firecrawl (root + sub-pages)
 const FIRECRAWL_PAGE_LIMIT = 50;
+// pgvector cosine distance cutoff for retrieval — drop chunks farther than this
+// (0 = identical, ~2 = opposite). Keeps obviously-irrelevant chunks out of context.
+const KNOWLEDGE_MAX_DISTANCE = 0.65;
 
 export type LearnStep =
     | { type: 'searching'; message: string }
@@ -44,15 +49,67 @@ export type LearnStep =
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
+/**
+ * Strip crawl noise that pollutes retrieval: markdown images, link URLs, bare URLs,
+ * cookie/consent banners, "Last updated" metadata, empty markdown artifacts.
+ */
+function cleanMarkdown(text: string): string {
+    return text
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ') // ![alt](url) images
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // [text](url) → text
+        .replace(/https?:\/\/\S+/g, ' ') // bare URLs
+        .split('\n')
+        .filter((line) => {
+            const l = line.trim().toLowerCase();
+            if (!l) return true; // keep blanks for paragraph splitting
+            if (
+                /this site uses cookies|^accept(\s|reject|$)|acceptreject|privacy policy|^last updated|^cookie|^we use cookies|^skip to (content|main)/.test(
+                    l,
+                )
+            )
+                return false;
+            return true;
+        })
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim();
+}
+
+/** Paragraph-aware chunking with overlap; never splits mid-paragraph unless a single
+ *  paragraph exceeds CHUNK_SIZE. Drops tiny fragments. */
 function chunkText(text: string): string[] {
-    const chunks: string[] = [];
-    let offset = 0;
-    while (offset < text.length) {
-        chunks.push(text.slice(offset, offset + CHUNK_SIZE));
-        offset += CHUNK_SIZE;
-        if (chunks.length >= MAX_CHUNKS_PER_SOURCE) break;
+    const paras = text
+        .split(/\n{2,}/)
+        .map((p) => p.replace(/[ \t]+/g, ' ').trim())
+        .filter(Boolean);
+
+    // Hard-split any oversized paragraph (with overlap) into units.
+    const units: string[] = [];
+    for (const p of paras) {
+        if (p.length <= CHUNK_SIZE) {
+            units.push(p);
+        } else {
+            for (let i = 0; i < p.length; i += CHUNK_SIZE - CHUNK_OVERLAP) {
+                units.push(p.slice(i, i + CHUNK_SIZE));
+            }
+        }
     }
-    return chunks;
+
+    const chunks: string[] = [];
+    let buf = '';
+    for (const u of units) {
+        if (buf && buf.length + u.length + 1 > CHUNK_SIZE) {
+            chunks.push(buf);
+            if (chunks.length >= MAX_CHUNKS_PER_SOURCE) break;
+            buf = u;
+        } else {
+            buf = buf ? `${buf}\n${u}` : u;
+        }
+    }
+    if (buf && chunks.length < MAX_CHUNKS_PER_SOURCE) chunks.push(buf);
+
+    return chunks.map((c) => c.trim()).filter((c) => c.length >= MIN_CHUNK).slice(0, MAX_CHUNKS_PER_SOURCE);
 }
 
 function contentHash(text: string): string {
@@ -77,7 +134,7 @@ async function storeChunks(
     title: string,
     body: string,
 ): Promise<number> {
-    const chunks = chunkText(body.trim());
+    const chunks = chunkText(cleanMarkdown(body));
     let stored = 0;
     for (const chunk of chunks) {
         if (!chunk.trim()) continue;
@@ -250,8 +307,16 @@ export async function retrieveAppKnowledge(
         return null;
     }
     try {
-        const rows = await similarAppKnowledge(appKey, JSON.stringify(vec), k);
-        return rows.map((r) => ({
+        // Over-fetch, then keep only chunks within the relevance cutoff (drop noise).
+        const rows = await similarAppKnowledge(appKey, JSON.stringify(vec), k * 3);
+        const relevant = rows.filter((r) => r.distance <= KNOWLEDGE_MAX_DISTANCE).slice(0, k);
+        if (rows.length && !relevant.length) {
+            logger.info(
+                { appKey, best: rows[0]?.distance },
+                'retrieveAppKnowledge: all chunks beyond relevance cutoff — returning none',
+            );
+        }
+        return relevant.map((r) => ({
             chunkId: r.chunkId,
             source: r.source as 'web_search' | 'doc_url' | 'app_store',
             url: r.url ?? undefined,

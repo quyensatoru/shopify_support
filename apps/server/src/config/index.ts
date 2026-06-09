@@ -17,6 +17,7 @@ export function resolveAppConfig(row: AppConfigRow): ResolvedAppConfig {
             gitlabProjectId: repo['gitlabProjectId'],
             url: repo['url'] ?? '',
             branch: repo['branch'] ?? 'main',
+            role: repo['role'] || undefined,
         };
     });
 
